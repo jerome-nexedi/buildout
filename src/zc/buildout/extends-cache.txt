@@ -457,12 +457,30 @@ used:
 ... extends = %sbase.cfg
 ... bar = foo
 ... """ % server_url)
+>>> write(server_data, 'baseC.cfg', """\
+... [buildout]
+... extends-cache = cache
+... extends = baseB.cfg
+... bar = foo
+... """)
+>>> write(server_data, 'baseD.cfg', """\
+... [buildout]
+... extends-cache = cache
+... bar = foo
+... """)
+>>> mkdir(server_data, 'deeper')
+>>> write(server_data, 'deeper', 'base.cfg', """\
+... [buildout]
+... extends-cache = cache
+... extends = ../baseD.cfg
+... bar = foo
+... """)
 >>> write('buildout.cfg', """\
 ... [buildout]
 ... extends-cache = cache
 ... newest = true
-... extends = %sbaseA.cfg %sbaseB.cfg
-... """ % (server_url, server_url))
+... extends = %sbaseA.cfg %sbaseB.cfg %sbaseC.cfg %sdeeper/base.cfg
+... """ % (server_url, server_url, server_url, server_url))
 >>> print_(system(buildout + " -n"))
 Unused options for buildout: 'bar' 'foo'.
 
@@ -480,6 +498,10 @@ a better solution would re-use the logging already done by the utility.)
 The URL http://localhost/baseA.cfg was downloaded.
 The URL http://localhost/base.cfg was downloaded.
 The URL http://localhost/baseB.cfg was downloaded.
+The URL http://localhost/baseC.cfg was downloaded.
+The URL http://localhost/baseB.cfg was downloaded.
+The URL http://localhost/deeper/base.cfg was downloaded.
+The URL http://localhost/baseD.cfg was downloaded.
 Not upgrading because not running a local buildout command.
 Unused options for buildout: 'bar' 'foo'.
 

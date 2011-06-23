@@ -1563,6 +1563,11 @@ def _open(base, filename, seen, dl_options, override, downloaded):
 
     Recursively open other files based on buildout options found.
     """
+    counter = 0
+    while filename.startswith('../'):
+      filename = filename.replace('../', '', 1)
+      counter += 1
+    base = base.rsplit('/', counter)[0]
     _update_section(dl_options, override)
     _dl_options = _unannotate_section(dl_options.copy())
     newest = bool_option(_dl_options, 'newest', 'false')
