@@ -24,6 +24,8 @@ def rmtree (path):
     read only file.
     This tries to chmod the file to writeable and retries before giving up.
 
+    Also it tries to remove symlink itself if a symlink as passed as
+    path argument.
     >>> from tempfile import mkdtemp
 
     Let's make a directory ...
@@ -39,6 +41,8 @@ def rmtree (path):
 
     >>> foo = os.path.join (d, 'foo')
     >>> _ = open (foo, 'w').write ('huhu')
+    >>> bar = os.path.join (d, 'bar')
+    >>> os.symlink(bar, bar)
 
     and make it unwriteable
 
@@ -52,10 +56,49 @@ def rmtree (path):
 
     >>> os.path.isdir (d)
     0
+
+    Let's make a directory ...
+
+    >>> d = mkdtemp()
+
+    and make sure it is actually there
+
+    >>> os.path.isdir (d)
+    1
+
+    Now create a broken symlink ...
+
+    >>> foo = os.path.join (d, 'foo')
+    >>> os.symlink(foo + '.not_exist', foo)
+
+    rmtree should be able to remove it:
+
+    >>> rmtree (foo)
+
+    and now the directory is gone
+
+    >>> os.path.isdir (foo)
+    0
+
+    cleanup directory
+
+    >>> rmtree (d)
+
+    and now the directory is gone
+
+    >>> os.path.isdir (d)
+    0
     """
     def retry_writeable (func, path, exc):
-        os.chmod (path, 384) # 0600
-        func (path)
+        if func is os.path.islink:
+            os.unlink(path)
+        elif func is os.lstat:
+            if not os.path.islink(path):
+                raise
+            os.unlink(path)
+        else:
+            os.chmod(path, 0600)
+            func(path)
 
     shutil.rmtree (path, onerror = retry_writeable)
 
