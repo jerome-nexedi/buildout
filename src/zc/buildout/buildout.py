@@ -46,6 +46,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import pprint
 import zc.buildout
 import zc.buildout.download
 
@@ -63,6 +64,63 @@ def print_(*args, **kw):
     if file is None:
         file = sys.stdout
     file.write(sep.join(map(str, args))+end)
+
+class BuildoutSerialiser(object):
+    # XXX: I would like to access pprint._safe_repr, but it's not
+    # officially available. PrettyPrinter class has a functionally-speaking
+    # static method "format" which just calls _safe_repr, but it is not
+    # declared as static... So I must create an instance of it.
+    _format = pprint.PrettyPrinter().format
+    _dollar = '\\x%02x' % ord('$')
+    _semicolon = '\\x%02x' % ord(';')
+    _safe_globals = {'__builtins__': {
+        # Types which are represented as calls to their constructor.
+        'bytearray': bytearray,
+        'complex': complex,
+        'frozenset': frozenset,
+        'set': set,
+        # Those buildins are available through keywords, which allow creating
+        # instances which in turn give back access to classes. So no point in
+        # hiding them.
+        'dict': dict,
+        'list': list,
+        'str': str,
+        'tuple': tuple,
+        'False': False,
+        'True': True,
+    }}
+
+    def loads(self, value):
+        return eval(value, self._safe_globals)
+
+    def dumps(self, value):
+        value, isreadable, _ = self._format(value, {}, 0, 0)
+        if not isreadable:
+            raise ValueError('Value cannot be serialised: %s' % (value, ))
+        return value.replace('$', self._dollar).replace(';', self._semicolon)
+
+SERIALISED_VALUE_MAGIC = '!py'
+SERIALISED = re.compile(SERIALISED_VALUE_MAGIC + '([^!]*)!(.*)')
+SERIALISER_REGISTRY = {
+    '': BuildoutSerialiser(),
+}
+SERIALISER_VERSION = ''
+SERIALISER = SERIALISER_REGISTRY[SERIALISER_VERSION]
+# Used only to compose data
+SERIALISER_PREFIX = SERIALISED_VALUE_MAGIC + SERIALISER_VERSION + '!'
+assert SERIALISED.match(SERIALISER_PREFIX).groups() == (
+    SERIALISER_VERSION, ''), SERIALISED.match(SERIALISER_PREFIX).groups()
+
+def dumps(value):
+    orig_value = value
+    value = SERIALISER.dumps(value)
+    assert SERIALISER.loads(value) == orig_value, (repr(value), orig_value)
+    return SERIALISER_PREFIX + value
+
+def loads(value):
+    assert value.startswith(SERIALISED_VALUE_MAGIC), repr(value)
+    version, data = SERIALISED.match(value).groups()
+    return SERIALISER_REGISTRY[version].loads(data)
 
 realpath = zc.buildout.easy_install.realpath
 
@@ -1422,18 +1480,23 @@ class Options(DictMixin):
 
     def __getitem__(self, key):
         try:
-            return self._data[key]
+            v = self._data[key]
+            if v.startswith(SERIALISED_VALUE_MAGIC):
+                v = loads(v)
+            return v
         except KeyError:
             pass
 
         v = self.get(key)
         if v is None:
             raise MissingOption("Missing option: %s:%s" % (self.name, key))
+        elif v.startswith(SERIALISED_VALUE_MAGIC):
+            v = loads(v)
         return v
 
     def __setitem__(self, option, value):
         if not isinstance(value, str):
-            raise TypeError('Option values must be strings', value)
+            value = dumps(value)
         self._data[option] = value
 
     def __delitem__(self, key):
@@ -1462,6 +1525,9 @@ class Options(DictMixin):
         result = self._raw.copy()
         result.update(self._cooked)
         result.update(self._data)
+        for key, value in result.items():
+            if value.startswith(SERIALISED_VALUE_MAGIC):
+                result[key] = loads(value)
         return result
 
     def _call(self, f):
@@ -1528,6 +1594,8 @@ def _quote_spacey_nl(match):
     return result
 
 def _save_option(option, value, f):
+    if not isinstance(value, str):
+        value = dumps(value)
     value = _spacey_nl.sub(_quote_spacey_nl, value)
     if value.startswith('\n\t'):
         value = '%(__buildout_space_n__)s' + value[2:]
@@ -1537,10 +1605,8 @@ def _save_option(option, value, f):
 
 def _save_options(section, options, f):
     print_('[%s]' % section, file=f)
-    items = list(options.items())
-    items.sort()
-    for option, value in items:
-        _save_option(option, value, f)
+    for option in sorted(options.keys()):
+        _save_option(option, options.get(option), f)
 
 def _default_globals():
     """Return a mapping of default and precomputed expressions.
