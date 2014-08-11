@@ -866,7 +866,12 @@ class Buildout(DictMixin):
                 options = self[part] = {}
             recipe, entry = _recipe(options)
             req = pkg_resources.Requirement.parse(recipe)
-            sig = _dists_sig(pkg_resources.working_set.resolve([req]))
+            sig = sorted(set(_dists_sig(pkg_resources.working_set.resolve([req]))))
+            for dependency in sorted(getattr(options, '_dependency', ())):
+                m = md5()
+                for item in sorted(self.get(dependency).items()):
+                    m.update(('%r\0%r\0' % item).encode())
+                sig.append('%s:%s' % (dependency, m.hexdigest()))
             options['__buildout_signature__'] = ' '.join(sig)
 
     def _read_installed_part_options(self):
@@ -1274,6 +1279,7 @@ class Options(DictMixin):
         self._raw = data
         self._cooked = {}
         self._data = {}
+        self._dependency = set()
 
     def _initialize(self):
         name = self.name
@@ -1400,6 +1406,8 @@ class Options(DictMixin):
             section, option = s
             if not section:
                 section = self.name
+            elif section != 'buildout':
+                self._dependency.add(section)
             v = self.buildout[section].get(option, None, seen)
             if v is None:
                 if option == '_buildout_section_name_':

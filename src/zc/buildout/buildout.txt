@@ -2529,7 +2529,7 @@ were created.
 The .installed.cfg is only updated for the recipes that ran:
 
     >>> cat(sample_buildout, '.installed.cfg')
-    ... # doctest: +NORMALIZE_WHITESPACE
+    ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
     [buildout]
     installed_develop_eggs = /sample-buildout/develop-eggs/recipes.egg-link
     parts = debug d1 d2 d3 d4
@@ -2559,7 +2559,7 @@ The .installed.cfg is only updated for the recipes that ran:
     <BLANKLINE>
     [d4]
     __buildout_installed__ = /sample-buildout/data2-extra
-    __buildout_signature__ = recipes-PiIFiO8ny5yNZ1S3JfT0xg==
+    __buildout_signature__ = recipes-PiIFiO8ny5yNZ1S3JfT0xg== d2:...
     path = /sample-buildout/data2-extra
     recipe = recipes:mkdir
 
@@ -2571,6 +2571,7 @@ Now, if we run the buildout without the install command:
 
     >>> print_(system(buildout), end='')
     Develop: '/sample-buildout/recipes'
+    Uninstalling d4.
     Uninstalling d2.
     Uninstalling d1.
     Uninstalling debug.
@@ -2580,7 +2581,8 @@ Now, if we run the buildout without the install command:
     Installing d2.
     d2: Creating directory data2
     Updating d3.
-    Updating d4.
+    Installing d4.
+    d4: Creating directory data2-extra
 
 We see the output of the debug recipe and that data2 was created.  We
 also see that d1 and d2 have gone away:

@@ -97,17 +97,14 @@ of extra requirements to be included in the working set.
 We can see that the options were augmented with additional data
 computed by the egg recipe by looking at .installed.cfg:
 
-    >>> cat(sample_buildout, '.installed.cfg')
+    >>> cat(sample_buildout, '.installed.cfg') # doctest: +ELLIPSIS
     [buildout]
     installed_develop_eggs = /sample-buildout/develop-eggs/sample.egg-link
     parts = sample-part
     <BLANKLINE>
     [sample-part]
     __buildout_installed__ = 
-    __buildout_signature__ = sample-6aWMvV2EJ9Ijq+bR8ugArQ==
-            zc.recipe.egg-cAsnudgkduAa/Fd+WJIM6Q==
-            setuptools-0.7-py2.4.egg
-            zc.buildout-+rYeCcmFuD1K/aB77XTj5A==
+    __buildout_signature__ = sample-... setuptools-...egg zc.buildout-... zc.recipe.egg-...
     _b = /sample-buildout/bin
     _d = /sample-buildout/develop-eggs
     _e = /sample-buildout/eggs
