@@ -83,6 +83,23 @@ class Custom(Base):
 
         distribution = options.get('egg', options.get('eggs', self.name)
                                    ).strip()
+
+        setup_eggs = [
+            r.strip()
+            for r in options.get('setup-eggs', '').split('\n')
+            if r.strip()]
+        if setup_eggs:
+            ws = zc.buildout.easy_install.install(
+                setup_eggs, options['_e'],
+                links=self.links,
+                index=self.index,
+                executable=sys.executable,
+                path=[options['_d'], options['_e']],
+                newest=self.newest,
+                )
+            extra_path = os.pathsep.join(ws.entries)
+            self.environment['PYTHONEXTRAPATH'] = os.environ['PYTHONEXTRAPATH'] = extra_path
+
         self._set_environment()
         try:
             return zc.buildout.easy_install.build(

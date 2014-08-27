@@ -339,10 +339,13 @@ class Installer:
 
         tmp = tempfile.mkdtemp(dir=dest)
         try:
-            path = setuptools_loc
+            path_list = [setuptools_loc]
+            extra_path = os.environ.get('PYTHONEXTRAPATH')
+            if extra_path:
+                path_list += extra_path.split(os.pathsep)
 
             args = [sys.executable, '-c',
-                    ('import sys; sys.path[0:0] = [%r]; ' % path) +
+                    ('import sys; sys.path[0:0] = %r; ' % path_list) +
                     _easy_install_cmd, '-mZUNxd', tmp]
             level = logger.getEffectiveLevel()
             if level > 0:
@@ -353,8 +356,8 @@ class Installer:
             args.append(spec)
 
             if level <= logging.DEBUG:
-                logger.debug('Running easy_install:\n"%s"\npath=%s\n',
-                             '" "'.join(args), path)
+                logger.debug('Running easy_install:\n"%s"\npath_list=%r\n',
+                             '" "'.join(args), path_list)
 
             sys.stdout.flush() # We want any pending output first
 
