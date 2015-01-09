@@ -9,6 +9,19 @@ eggs
     requirement strings.  Each string must be given on a separate
     line.
 
+patch-binary
+   The path to the patch executable.
+
+EGGNAME-patches
+   A new-line separated list of patchs to apply when building.
+
+EGGNAME-patch-options
+   Options to give to the patch program when applying patches.
+
+EGGNAME-patch-revision
+   An integer to specify the revision (default is the number of
+   patches).
+
 find-links
    A list of URLs, files, or directories to search for distributions.
 

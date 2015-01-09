@@ -51,6 +51,34 @@ class Eggs(object):
         options['develop-eggs-directory'] = b_options['develop-eggs-directory']
         options['_d'] = options['develop-eggs-directory'] # backward compat.
 
+    def _get_patch_dict(self, options, distribution_list):
+        patch_dict = {}
+        global_patch_binary = options.get('patch-binary', 'patch')
+        def get_option(egg, key, default):
+            if len(distribution_list) == 1:
+                return options.get('%s-%s' % (egg, key),
+                                   options.get(key, default))
+            else:
+                return options.get('%s-%s' % (egg, key), default)
+        for distribution in distribution_list:
+            egg = re.sub('[<>=].*', '', distribution)
+            patches = filter(lambda x:x,
+                             map(lambda x:x.strip(),
+                                 get_option(egg, 'patches', '').splitlines()))
+            patches = list(patches)
+            if not patches:
+                continue
+            patch_options = get_option(egg, 'patch-options', '-p0').split()
+            patch_binary = get_option(egg, 'patch-binary', global_patch_binary)
+            patch_revision = int(get_option(egg, 'patch-revision', len(patches)))
+            patch_dict[egg] = {
+              'patches':patches,
+              'patch_options':patch_options,
+              'patch_binary':patch_binary,
+              'patch_revision':patch_revision,
+            }
+        return patch_dict
+
     def working_set(self, extra=()):
         """Separate method to just get the working set
 
@@ -75,13 +103,15 @@ class Eggs(object):
                 [options['develop-eggs-directory'], options['eggs-directory']]
                 )
         else:
+            patch_dict = self._get_patch_dict(options, distributions)
             ws = zc.buildout.easy_install.install(
                 distributions, options['eggs-directory'],
                 links=self.links,
                 index=self.index,
                 path=[options['develop-eggs-directory']],
                 newest=self.buildout['buildout'].get('newest') == 'true',
-                allow_hosts=self.allow_hosts)
+                allow_hosts=self.allow_hosts,
+                patch_dict=patch_dict)
 
         return orig_distributions, ws
 

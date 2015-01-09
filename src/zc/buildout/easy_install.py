@@ -58,6 +58,9 @@ is_source_encoding_line = re.compile('coding[:=]\s*([-\w.]+)').search
 is_win32 = sys.platform == 'win32'
 is_jython = sys.platform.startswith('java')
 
+PATCH_MARKER = 'SlapOSPatched'
+orig_versions_re = re.compile(r'[+\-]%s\d+' % PATCH_MARKER)
+
 if is_jython:
     import java.lang.System
     jython_os_name = (java.lang.System.getProperties()['os.name']).lower()
@@ -418,6 +421,11 @@ class Installer:
             shutil.rmtree(tmp)
 
     def _obtain(self, requirement, source=None):
+        # get the non-patched version
+        req = str(requirement)
+        if PATCH_MARKER in req:
+            requirement = pkg_resources.Requirement.parse(re.sub(orig_versions_re, '', req))
+
         # initialize out index for this project:
         index = self._index
 
@@ -642,7 +650,7 @@ class Installer:
 
         return requirement
 
-    def install(self, specs, working_set=None):
+    def install(self, specs, working_set=None, patch_dict=None):
 
         logger.debug('Installing %s.', repr(specs)[1:-1])
         self._requirements_and_constraints.append(
@@ -663,6 +671,9 @@ class Installer:
             ws = working_set
 
         for requirement in requirements:
+            if patch_dict and requirement.project_name in patch_dict:
+                self._env.scan(
+                    self.build(str(requirement), {}, patch_dict=patch_dict))
             for dist in self._get_dist(requirement, ws,
                                        for_buildout_run=for_buildout_run):
                 ws.add(dist)
@@ -733,7 +744,7 @@ class Installer:
             processed[req] = True
         return ws
 
-    def build(self, spec, build_ext):
+    def build(self, spec, build_ext, patch_dict=None):
 
         requirement = self._constrain(pkg_resources.Requirement.parse(spec))
 
@@ -784,12 +795,31 @@ class Installer:
                             )
                     base = os.path.dirname(setups[0])
 
+                setup_cfg_dict = {'build_ext':build_ext}
+                patch_dict = (patch_dict or {}).get(re.sub('[<>=].*', '', spec))
+                if patch_dict:
+                    setup_cfg_dict.update(
+                      {'egg_info':{'tag_build':'+%s%03d' % (PATCH_MARKER,
+                                                            patch_dict['patch_revision'])}})
+                    for i, patch in enumerate(patch_dict['patches']):
+                        url, md5sum = (patch.strip().split('#', 1) + [''])[:2]
+                        download = zc.buildout.download.Download()
+                        path, is_temp = download(url, md5sum=md5sum or None,
+                                                 path=os.path.join(tmp, 'patch.%s' % i))
+                        args = [patch_dict['patch_binary']] + patch_dict['patch_options']
+                        kwargs = {'cwd':base,
+                                  'stdin':open(path)}
+                        popen = subprocess.Popen(args, **kwargs)
+                        popen.communicate()
+                        if popen.returncode != 0:
+                            raise subprocess.CalledProcessError(
+                                popen.returncode, ' '.join(args))
                 setup_cfg = os.path.join(base, 'setup.cfg')
                 if not os.path.exists(setup_cfg):
                     f = open(setup_cfg, 'w')
                     f.close()
                 setuptools.command.setopt.edit_config(
-                    setup_cfg, dict(build_ext=build_ext))
+                    setup_cfg, setup_cfg_dict)
 
                 dists = self._call_easy_install(
                     base, pkg_resources.WorkingSet(),
@@ -874,6 +904,7 @@ def install(specs, dest,
             use_dependency_links=None, allow_hosts=('*',),
             include_site_packages=None,
             allowed_eggs_from_site_packages=None,
+            patch_dict=None,
             ):
     assert executable == sys.executable, (executable, sys.executable)
     assert include_site_packages is None
@@ -883,18 +914,19 @@ def install(specs, dest,
                           always_unzip, path,
                           newest, versions, use_dependency_links,
                           allow_hosts=allow_hosts)
-    return installer.install(specs, working_set)
+    return installer.install(specs, working_set, patch_dict=patch_dict)
 
 
 def build(spec, dest, build_ext,
           links=(), index=None,
           executable=sys.executable,
-          path=None, newest=True, versions=None, allow_hosts=('*',)):
+          path=None, newest=True, versions=None, allow_hosts=('*',),
+          patch_dict=None):
     assert executable == sys.executable, (executable, sys.executable)
     installer = Installer(dest, links, index, executable,
                           True, path, newest,
                           versions, allow_hosts=allow_hosts)
-    return installer.build(spec, build_ext)
+    return installer.build(spec, build_ext, patch_dict=patch_dict)
 
 
 def _rm(*paths):

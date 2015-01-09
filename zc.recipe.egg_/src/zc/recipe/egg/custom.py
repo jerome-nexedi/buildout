@@ -15,6 +15,7 @@
 """
 import logging
 import os
+import re
 import sys
 
 import zc.buildout.easy_install
@@ -34,6 +35,29 @@ class Base:
     def update(self):
         return self.install()
 
+    def _get_patch_dict(self, options, distribution):
+        patch_dict = {}
+        global_patch_binary = options.get('patch-binary', 'patch')
+        def get_option(egg, key, default):
+            return options.get('%s-%s' % (egg, key),
+                               options.get(key, default))
+        egg = re.sub('[<>=].*', '', distribution)
+        patches = filter(lambda x:x,
+                         map(lambda x:x.strip(),
+                             get_option(egg, 'patches', '').splitlines()))
+        patches = list(patches)
+        if not patches:
+            return patch_dict
+        patch_options = get_option(egg, 'patch-options', '-p0').split()
+        patch_binary = get_option(egg, 'patch-binary', global_patch_binary)
+        patch_revision = int(get_option(egg, 'patch-revision', len(patches)))
+        patch_dict[egg] = {
+          'patches':patches,
+          'patch_options':patch_options,
+          'patch_binary':patch_binary,
+          'patch_revision':patch_revision,
+        }
+        return patch_dict
 
 class Custom(Base):
 
@@ -102,10 +126,11 @@ class Custom(Base):
 
         self._set_environment()
         try:
+            patch_dict = self._get_patch_dict(options, distribution)
             return zc.buildout.easy_install.build(
                 distribution, options['_d'], self.build_ext,
                 self.links, self.index, sys.executable,
-                [options['_e']], newest=self.newest,
+                [options['_e']], newest=self.newest, patch_dict=patch_dict,
                 )
         finally:
             self._restore_environment()

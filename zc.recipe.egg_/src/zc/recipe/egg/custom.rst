@@ -24,6 +24,19 @@ setup-eggs
    A new-line separated list of eggs that need to be installed
    beforehand. It is useful to meet the `setup_requires` requirement.
 
+patch-binary
+   The path to the patch executable.
+
+patches
+   A new-line separated list of patchs to apply when building.
+
+patch-options
+   Options to give to the patch program when applying patches.
+
+patch-revision
+   An integer to specify the revision (default is the number of
+   patches).
+
 define
    A comma-separated list of names of C preprocessor variables to
    define.
