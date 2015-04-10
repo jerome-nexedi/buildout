@@ -41,6 +41,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
 import zc.buildout
 import zc.buildout.download
 
@@ -665,11 +669,16 @@ class Buildout(DictMixin):
 
     def _update_installed(self, **buildout_options):
         installed = self['buildout']['installed']
-        f = open(installed, 'a')
-        f.write('\n[buildout]\n')
+        # read old installed database
+        with open(installed, 'r') as f:
+            installed_data = f.read()
+
+        installed_data = '%s\n[buildout]\n' % installed_data
+        f = StringIO()
+        f.write(installed_data)
         for option, value in list(buildout_options.items()):
             _save_option(option, value, f)
-        f.close()
+        self._save_installed_database(f.getvalue())
 
     def _uninstall_part(self, part, installed_part_options):
         # uninstall part
@@ -829,17 +838,27 @@ class Buildout(DictMixin):
                      for d in installed]
         return ' '.join(installed)
 
+    def _save_installed_database(self, text):
+        # Saved installed database in an atomic fashion
+        installed = self['buildout']['installed']
+        temp_installed = '%s.tmp' % installed
+        with open(temp_installed, 'w') as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        os.rename(temp_installed, installed)
 
     def _save_installed_options(self, installed_options):
         installed = self['buildout']['installed']
         if not installed:
             return
-        f = open(installed, 'w')
+        f = StringIO()
         _save_options('buildout', installed_options['buildout'], f)
         for part in installed_options['buildout']['parts'].split():
             print_(file=f)
             _save_options(part, installed_options[part], f)
-        f.close()
+
+        self._save_installed_database(f.getvalue())
 
     def _error(self, message, *args):
         raise zc.buildout.UserError(message % args)
