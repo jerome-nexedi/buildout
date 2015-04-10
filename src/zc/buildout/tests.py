@@ -1444,6 +1444,30 @@ def whine_about_unused_options():
     Unused options for foo: 'z'.
     '''
 
+def incorrect_buildout_syntax():
+    """
+Incorrect buildout should not corrupt installed database
+
+    >>> write('buildout.cfg',
+    ... '''
+    ... [buildout]
+    ... += error
+    ...
+    ... ''')
+
+    >>> print_(system(buildout), end='')
+    Develop: '/sample-buildout/recipes'
+    Installing p1.
+    Installing p2.
+    Installing p3.
+
+    >>> print_(system(buildout), end='')
+    Develop: '/sample-buildout/recipes'
+    Updating p1.
+    Updating p2.
+    Installing p3.
+"""
+
 def abnormal_exit():
     """
 People sometimes hit control-c while running a builout. We need to make

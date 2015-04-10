@@ -45,6 +45,7 @@ try:
     from cStringIO import StringIO
 except ImportError:
     from io import StringIO
+import textwrap
 import zc.buildout
 import zc.buildout.download
 
@@ -1124,12 +1125,6 @@ class Buildout(DictMixin):
         self[name] # Add to parts
 
     def parse(self, data):
-        try:
-            from cStringIO import StringIO
-        except ImportError:
-            from io import StringIO
-        import textwrap
-
         sections = zc.buildout.configparser.parse(
             StringIO(textwrap.dedent(data)), '', _default_globals)
         for name in sections:
