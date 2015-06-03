@@ -508,6 +508,10 @@ swig-cpp
 swig-opts
    List of SWIG command line options
 
+environment
+   The name of a section with additional environment variables. The
+   environment variables are set before the egg is built.
+
 To illustrate this, we'll use a directory containing the extdemo
 example from the earlier section:
 

@@ -30,10 +30,46 @@ class Base:
 
         options['_d'] = buildout['buildout']['develop-eggs-directory']
 
+        environment_section = options.get('environment')
+        if environment_section:
+            self.environment = buildout[environment_section]
+        else:
+            self.environment = {}
+        environment_data = list(self.environment.items())
+        environment_data.sort()
+        options['_environment-data'] = repr(environment_data)
+
         self.build_ext = build_ext(buildout, options)
+
+    def install(self):
+        self._set_environment()
+        try:
+            return self._install()
+        finally:
+            self._restore_environment()
 
     def update(self):
         return self.install()
+
+    def _set_environment(self):
+        self._saved_environment = {}
+        for key, value in list(self.environment.items()):
+            if key in os.environ:
+                self._saved_environment[key] = os.environ[key]
+            # Interpolate value with variables from environment. Maybe there
+            # should be a general way of doing this in buildout with something
+            # like ${environ:foo}:
+            os.environ[key] = value % os.environ
+
+    def _restore_environment(self):
+        for key in self.environment:
+            if key in self._saved_environment:
+                os.environ[key] = self._saved_environment[key]
+            else:
+                try:
+                    del os.environ[key]
+                except KeyError:
+                    pass
 
     def _get_patch_dict(self, options, distribution):
         patch_dict = {}
@@ -78,23 +114,14 @@ class Custom(Base):
             options['index'] = index
         self.index = index
 
-        environment_section = options.get('environment')
-        if environment_section:
-            self.environment = buildout[environment_section]
-        else:
-            self.environment = {}
-        environment_data = list(self.environment.items())
-        environment_data.sort()
-        options['_environment-data'] = repr(environment_data)
-
         options['_e'] = buildout['buildout']['eggs-directory']
 
         if buildout['buildout'].get('offline') == 'true':
-            self.install = lambda: ()
+            self._install = lambda: ()
 
         self.newest = buildout['buildout'].get('newest') == 'true'
 
-    def install(self):
+    def _install(self):
         options = self.options
         distribution = options.get('egg')
         if distribution is None:
@@ -124,37 +151,12 @@ class Custom(Base):
             extra_path = os.pathsep.join(ws.entries)
             self.environment['PYTHONEXTRAPATH'] = os.environ['PYTHONEXTRAPATH'] = extra_path
 
-        self._set_environment()
-        try:
-            patch_dict = self._get_patch_dict(options, distribution)
-            return zc.buildout.easy_install.build(
-                distribution, options['_d'], self.build_ext,
-                self.links, self.index, sys.executable,
-                [options['_e']], newest=self.newest, patch_dict=patch_dict,
-                )
-        finally:
-            self._restore_environment()
-
-
-    def _set_environment(self):
-        self._saved_environment = {}
-        for key, value in list(self.environment.items()):
-            if key in os.environ:
-                self._saved_environment[key] = os.environ[key]
-            # Interpolate value with variables from environment. Maybe there
-            # should be a general way of doing this in buildout with something
-            # like ${environ:foo}:
-            os.environ[key] = value % os.environ
-
-    def _restore_environment(self):
-        for key in self.environment:
-            if key in self._saved_environment:
-                os.environ[key] = self._saved_environment[key]
-            else:
-                try:
-                    del os.environ[key]
-                except KeyError:
-                    pass
+        patch_dict = self._get_patch_dict(options, distribution)
+        return zc.buildout.easy_install.build(
+            distribution, options['_d'], self.build_ext,
+            self.links, self.index, sys.executable,
+            [options['_e']], newest=self.newest, patch_dict=patch_dict,
+            )
 
 
 class Develop(Base):
@@ -164,7 +166,7 @@ class Develop(Base):
         options['setup'] = os.path.join(buildout['buildout']['directory'],
                                         options['setup'])
 
-    def install(self):
+    def _install(self):
         options = self.options
         return zc.buildout.easy_install.develop(
             options['setup'], options['_d'], self.build_ext)
