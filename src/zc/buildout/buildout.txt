@@ -2635,9 +2635,9 @@ provide alternate locations, and even names for these directories.
     Creating directory '/sample-alt/developbasket'.
     Develop: '/sample-buildout/recipes'
     Uninstalling d4.
-    Uninstalling d3.
     Uninstalling d2.
     Uninstalling debug.
+    Uninstalling d3.
 
     >>> ls(alt)
     d  basket

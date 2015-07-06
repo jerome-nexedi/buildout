@@ -443,8 +443,8 @@ Create a clean buildout.cfg w/o the checkenv recipe, and delete the recipe:
     ... """ % dict(server=link_server))
     >>> print_(system(buildout), end='') # doctest: +ELLIPSIS
     Develop: '/sample-buildout/recipes'
-    Uninstalling checkenv.
     Uninstalling extdemo.
+    Uninstalling checkenv.
     Installing extdemo...
 
     >>> rmdir(sample_buildout, 'recipes')

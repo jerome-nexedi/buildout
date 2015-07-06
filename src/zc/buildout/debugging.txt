@@ -85,6 +85,8 @@ supply some input:
       File "/zc/buildout/buildout.py", line 1352, in main
         getattr(buildout, command)(args)
       File "/zc/buildout/buildout.py", line 383, in install
+        self._install_parts(install_args)
+      File buildout.py", line 791, in _install_parts
         installed_files = self[part]._call(recipe.install)
       File "/zc/buildout/buildout.py", line 961, in _call
         return f()

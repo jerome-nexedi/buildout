@@ -36,6 +36,7 @@ import zc.buildout.configparser
 import copy
 import datetime
 import distutils.errors
+import errno
 import glob
 import itertools
 import logging
@@ -177,6 +178,12 @@ def _print_annotate(data):
                     line = '   '
     print_()
 
+def _remove_ignore_missing(path):
+    try:
+        os.remove(path)
+    except OSError as e:
+        if e.errno != errno.ENOENT:
+            raise
 
 def _unannotate_section(section):
     for key in section:
@@ -231,6 +238,8 @@ _buildout_default_options = _annotate_section({
     }, 'DEFAULT_VALUE')
 
 class Buildout(DictMixin):
+
+    installed_part_options = None
 
     def __init__(self, config_file, cloptions,
                  user_defaults=True,
@@ -619,6 +628,19 @@ class Buildout(DictMixin):
             self.install(())
 
     def install(self, install_args):
+        try:
+            self._install_parts(install_args)
+        finally:
+            if self.installed_part_options is not None:
+                try:
+                    self._save_installed_options()
+                finally:
+                    del self.installed_part_options
+        if self.show_picked_versions or self.update_versions_file:
+            self._print_picked_versions()
+        self._unload_extensions()
+
+    def _install_parts(self, install_args):
         __doing__ = 'Installing.'
 
         self._load_extensions()
@@ -632,8 +654,8 @@ class Buildout(DictMixin):
         self._maybe_upgrade()
 
         # load installed data
-        (installed_part_options, installed_exists
-         )= self._read_installed_part_options()
+        installed_part_options = self._read_installed_part_options()
+        installed_parts = installed_part_options['buildout']['parts'].split()
 
         # Remove old develop eggs
         self._uninstall(
@@ -646,21 +668,15 @@ class Buildout(DictMixin):
         installed_part_options['buildout']['installed_develop_eggs'
                                            ] = installed_develop_eggs
 
-        if installed_exists:
-            self._update_installed(
-                installed_develop_eggs=installed_develop_eggs)
+        # From now, the caller will update the .installed.cfg at return.
+        self.installed_part_options = installed_part_options
 
-        # get configured and installed part lists
-        conf_parts = self['buildout']['parts']
-        conf_parts = conf_parts and conf_parts.split() or []
-        installed_parts = installed_part_options['buildout']['parts']
-        installed_parts = installed_parts and installed_parts.split() or []
-
+        install_parts = self['buildout']['parts']
         if install_args:
             install_parts = install_args
             uninstall_missing = False
         else:
-            install_parts = conf_parts
+            install_parts = install_parts.split()
             uninstall_missing = True
 
         # load and initialize recipes
@@ -721,9 +737,8 @@ class Buildout(DictMixin):
 
             self._uninstall_part(part, installed_part_options)
             installed_parts = [p for p in installed_parts if p != part]
-
-            if installed_exists:
-                self._update_installed(parts=' '.join(installed_parts))
+            installed_part_options['buildout']['parts'] = (
+                ' '.join(installed_parts))
 
         # Check for unused buildout options:
         _check_for_unused_options_in_section(self, 'buildout')
@@ -734,11 +749,10 @@ class Buildout(DictMixin):
             saved_options = self[part].copy()
             recipe = self[part].recipe
             if part in installed_parts: # update
-                need_to_save_installed = False
                 __doing__ = 'Updating %s.', part
                 self._logger.info(*__doing__)
                 old_options = installed_part_options[part]
-                old_installed_files = old_options['__buildout_installed__']
+                installed_files = old_options['__buildout_installed__']
 
                 try:
                     update = recipe.update
@@ -750,34 +764,21 @@ class Buildout(DictMixin):
                         part)
 
                 try:
-                    installed_files = self[part]._call(update)
-                except:
+                    updated_files = self[part]._call(update)
+                except Exception:
                     installed_parts.remove(part)
-                    self._uninstall(old_installed_files)
-                    if installed_exists:
-                        self._update_installed(
-                            parts=' '.join(installed_parts))
+                    self._uninstall(installed_files)
+                    installed_part_options['buildout']['parts'] = (
+                        ' '.join(installed_parts))
                     raise
 
-                old_installed_files = old_installed_files.split('\n')
-                if installed_files is None:
-                    installed_files = old_installed_files
-                else:
-                    if isinstance(installed_files, str):
-                        installed_files = [installed_files]
-                    else:
-                        installed_files = list(installed_files)
-
-                    need_to_save_installed = [
-                        p for p in installed_files
-                        if p not in old_installed_files]
-
-                    if need_to_save_installed:
-                        installed_files = (old_installed_files
-                                           + need_to_save_installed)
+                if updated_files:
+                    installed_files = set(installed_files.split('\n'))
+                    (installed_files.add if isinstance(updated_files, str) else
+                     installed_files.update)(updated_files)
+                    installed_files = '\n'.join(sorted(installed_files))
 
             else: # install
-                need_to_save_installed = True
                 __doing__ = 'Installing %s.', part
                 self._logger.info(*__doing__)
                 installed_files = self[part]._call(recipe.install)
@@ -786,47 +787,19 @@ class Buildout(DictMixin):
                         "The %s install returned None.  A path or "
                         "iterable os paths should be returned.",
                         part)
-                    installed_files = ()
-                elif isinstance(installed_files, str):
-                    installed_files = [installed_files]
-                else:
-                    installed_files = list(installed_files)
+                    installed_files = ""
+                elif not isinstance(installed_files, str):
+                    installed_files = '\n'.join(installed_files)
 
-            installed_part_options[part] = saved_options
-            saved_options['__buildout_installed__'
-                          ] = '\n'.join(installed_files)
+            saved_options['__buildout_installed__'] = installed_files
             saved_options['__buildout_signature__'] = signature
+            installed_part_options[part] = saved_options
 
-            installed_parts = [p for p in installed_parts if p != part]
-            installed_parts.append(part)
-            _check_for_unused_options_in_section(self, part)
-
-            if need_to_save_installed:
+            if part not in installed_parts:
+                installed_parts.append(part)
                 installed_part_options['buildout']['parts'] = (
                     ' '.join(installed_parts))
-                self._save_installed_options(installed_part_options)
-                installed_exists = True
-            else:
-                assert installed_exists
-                self._update_installed(parts=' '.join(installed_parts))
-
-        if installed_develop_eggs:
-            if not installed_exists:
-                self._save_installed_options(installed_part_options)
-        elif (not installed_parts) and installed_exists:
-            os.remove(self['buildout']['installed'])
-
-        if self.show_picked_versions or self.update_versions_file:
-            self._print_picked_versions()
-        self._unload_extensions()
-
-    def _update_installed(self, **buildout_options):
-        installed = self['buildout']['installed']
-        f = open(installed, 'a')
-        f.write('\n[buildout]\n')
-        for option, value in list(buildout_options.items()):
-            _save_option(option, value, f)
-        f.close()
+                _check_for_unused_options_in_section(self, part)
 
     def _uninstall_part(self, part, installed_part_options):
         # uninstall part
@@ -947,11 +920,9 @@ class Buildout(DictMixin):
                         options[option] = value
                 result[section] = self.Options(self, section, options)
 
-            return result, True
+            return result
         else:
-            return ({'buildout': self.Options(self, 'buildout', {'parts': ''})},
-                    False,
-                    )
+            return {'buildout': self.Options(self, 'buildout', {'parts': ''})}
 
     def _uninstall(self, installed):
         for f in installed.split('\n'):
@@ -992,16 +963,39 @@ class Buildout(DictMixin):
         return ' '.join(installed)
 
 
-    def _save_installed_options(self, installed_options):
-        installed = self['buildout']['installed']
-        if not installed:
+    def _save_installed_options(self):
+        installed_path = self['buildout']['installed']
+        if not installed_path:
             return
-        f = open(installed, 'w')
-        _save_options('buildout', installed_options['buildout'], f)
-        for part in installed_options['buildout']['parts'].split():
-            print_(file=f)
-            _save_options(part, installed_options[part], f)
-        f.close()
+        installed_part_options = self.installed_part_options
+        buildout = installed_part_options['buildout']
+        installed_parts = buildout['parts']
+        if installed_parts or buildout['installed_develop_eggs']:
+            new = StringIO()
+            _save_options('buildout', buildout, new)
+            for part in installed_parts.split():
+                new.write('\n')
+                _save_options(part, installed_part_options[part], new)
+            new = new.getvalue()
+            try:
+                with open(installed_path) as f:
+                    save = f.read(1+len(new)) != new
+            except IOError as e:
+                if e.errno != errno.ENOENT:
+                    raise
+                save = True
+            if save:
+                installed_tmp = installed_path + ".tmp"
+                try:
+                    with open(installed_tmp, "w") as f:
+                        f.write(new)
+                        f.flush()
+                        os.fsync(f.fileno())
+                    os.rename(installed_tmp, installed_path)
+                finally:
+                    _remove_ignore_missing(installed_tmp)
+        else:
+            _remove_ignore_missing(installed_path)
 
     def _error(self, message, *args):
         raise zc.buildout.UserError(message % args)

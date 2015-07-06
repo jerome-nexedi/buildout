@@ -1498,7 +1498,7 @@ some evil recipes that exit uncleanly:
     >>> mkdir('recipes')
     >>> write('recipes', 'recipes.py',
     ... '''
-    ... import os
+    ... import sys
     ...
     ... class Clean:
     ...     def __init__(*_): pass
@@ -1506,10 +1506,10 @@ some evil recipes that exit uncleanly:
     ...     def update(_): pass
     ...
     ... class EvilInstall(Clean):
-    ...     def install(_): os._exit(1)
+    ...     def install(_): sys.exit(1)
     ...
     ... class EvilUpdate(Clean):
-    ...     def update(_): os._exit(1)
+    ...     def update(_): sys.exit(1)
     ... ''')
 
     >>> write('recipes', 'setup.py',
@@ -1603,10 +1603,10 @@ Now let's look at 3 cases:
 
     >>> print_(system(buildout+' buildout:parts='), end='')
     Develop: '/sample-buildout/recipes'
-    Uninstalling p2.
-    Uninstalling p1.
     Uninstalling p4.
     Uninstalling p3.
+    Uninstalling p2.
+    Uninstalling p1.
 
 3. We exit while installing or updating after uninstalling:
 
