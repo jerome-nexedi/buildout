@@ -228,6 +228,7 @@ _buildout_default_options = _annotate_section({
     'log-level': 'INFO',
     'newest': 'true',
     'offline': 'false',
+    'dry-run': 'false',
     'parts-directory': 'parts',
     'prefer-final': 'true',
     'python': 'buildout',
@@ -406,6 +407,7 @@ class Buildout(DictMixin):
         self.newest = ((not self.offline) and
                        bool_option(buildout_section, 'newest')
                        )
+        self.dry_run = (buildout_section['dry-run'] == 'true')
 
         ##################################################################
         ## WARNING!!!
@@ -751,6 +753,8 @@ class Buildout(DictMixin):
             if part in installed_parts: # update
                 __doing__ = 'Updating %s.', part
                 self._logger.info(*__doing__)
+                if self.dry_run:
+                    continue
                 old_options = installed_part_options[part]
                 installed_files = old_options['__buildout_installed__']
 
@@ -781,6 +785,8 @@ class Buildout(DictMixin):
             else: # install
                 __doing__ = 'Installing %s.', part
                 self._logger.info(*__doing__)
+                if self.dry_run:
+                    continue
                 installed_files = self[part]._call(recipe.install)
                 if installed_files is None:
                     self._logger.warning(
@@ -808,6 +814,8 @@ class Buildout(DictMixin):
         # uninstall part
         __doing__ = 'Uninstalling %s.', part
         self._logger.info(*__doing__)
+        if self.dry_run:
+            return
 
         # run uuinstall recipe
         recipe, entry = _recipe(installed_part_options[part])
@@ -967,6 +975,8 @@ class Buildout(DictMixin):
 
 
     def _save_installed_options(self):
+        if self.dry_run:
+            return
         installed_path = self['buildout']['installed']
         if not installed_path:
             return
@@ -1986,6 +1996,12 @@ Options:
     will be started. This is especially useful for debuging recipe
     problems.
 
+  --dry-run
+
+    Dry-run mode.  With this setting, buildout will display what will
+    be uninstalled and what will be installed without doing anything
+    in reality.
+
 Assignments are of the form: section:option=value and are used to
 provide configuration options that override those given in the
 configuration file.  For example, to run the buildout in offline mode,
@@ -2104,12 +2120,15 @@ def main(args=None):
                         _error("No timeout value specified for option", orig_op)
                     except ValueError:
                         _error("Timeout value must be numeric", orig_op)
+
+            elif orig_op == '--dry-run':
+                    options.append(('buildout', 'dry-run', 'true'))
             elif op:
                 if orig_op == '--help':
                     _help()
                 elif orig_op == '--version':
                     _version()
-                _error("Invalid option", '-'+op[0])
+                _error("Invalid option", orig_op)
         elif '=' in args[0]:
             option, value = args.pop(0).split('=', 1)
             option = option.split(':')

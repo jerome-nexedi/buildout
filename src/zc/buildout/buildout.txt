@@ -333,6 +333,10 @@ we'll see that the directory gets removed and recreated:
     ... path = mydata
     ... """)
 
+    >>> print_(system(buildout+' --dry-run'), end='')
+    Develop: '/sample-buildout/recipes'
+    Uninstalling data-dir.
+    Installing data-dir.
     >>> print_(system(buildout), end='')
     Develop: '/sample-buildout/recipes'
     Uninstalling data-dir.
@@ -353,6 +357,10 @@ If any of the files or directories created by a recipe are removed,
 the part will be reinstalled:
 
     >>> rmdir(sample_buildout, 'mydata')
+    >>> print_(system(buildout+' --dry-run'), end='')
+    Develop: '/sample-buildout/recipes'
+    Uninstalling data-dir.
+    Installing data-dir.
     >>> print_(system(buildout), end='')
     Develop: '/sample-buildout/recipes'
     Uninstalling data-dir.
@@ -810,6 +818,8 @@ COMMAND_LINE_VALUE).
         DEFAULT_VALUE
     directory= /sample-buildout
         COMPUTED_VALUE
+    dry-run= false
+        DEFAULT_VALUE
     eggs-directory= /sample-buildout/eggs
         DEFAULT_VALUE
     executable= ...
@@ -2747,6 +2757,7 @@ database is shown.
     bin-directory = /sample-buildout/bin
     develop-eggs-directory = /sample-buildout/develop-eggs
     directory = /sample-buildout
+    dry-run = false
     eggs-directory = /sample-buildout/eggs
     executable = python
     find-links =
