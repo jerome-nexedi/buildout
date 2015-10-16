@@ -229,6 +229,7 @@ _buildout_default_options = _annotate_section({
     'newest': 'true',
     'offline': 'false',
     'dry-run': 'false',
+    'check-signature': 'true',
     'parts-directory': 'parts',
     'prefer-final': 'true',
     'python': 'buildout',
@@ -408,6 +409,7 @@ class Buildout(DictMixin):
                        bool_option(buildout_section, 'newest')
                        )
         self.dry_run = (buildout_section['dry-run'] == 'true')
+        self.check_signature = (buildout_section['check-signature'] == 'true')
 
         ##################################################################
         ## WARNING!!!
@@ -706,6 +708,19 @@ class Buildout(DictMixin):
                 old_options = installed_part_options[part].copy()
                 installed_files = old_options.pop('__buildout_installed__')
                 new_options = self.get(part).copy()
+                if not self.check_signature:
+                    old_signature = old_options.get(
+                        '__buildout_signature__', None)
+                    new_signature = new_options.get(
+                        '__buildout_signature__', None)
+                    if old_signature != new_signature:
+                        self._logger.info(
+                            '[%s]: __buildout_signature__ is different '
+                            'but ignored.' % part)
+                        if new_signature:
+                            old_options['__buildout_signature__'] = new_signature
+                        else:
+                            del old_options['__buildout_signature__']
                 if old_options == new_options:
                     # The options are the same, but are all of the
                     # installed files still there?  If not, we should
@@ -2002,6 +2017,13 @@ Options:
     be uninstalled and what will be installed without doing anything
     in reality.
 
+  --skip-signature-check
+
+    Ignore __buildout_signature__ difference in comparing with the
+    previously installed state. Note that __buildout_signature__ is
+    updated with new dependencies by using this option.
+
+
 Assignments are of the form: section:option=value and are used to
 provide configuration options that override those given in the
 configuration file.  For example, to run the buildout in offline mode,
@@ -2123,6 +2145,8 @@ def main(args=None):
 
             elif orig_op == '--dry-run':
                     options.append(('buildout', 'dry-run', 'true'))
+            elif orig_op == '--skip-signature-check':
+                    options.append(('buildout', 'check-signature', 'false'))
             elif op:
                 if orig_op == '--help':
                     _help()

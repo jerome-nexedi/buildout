@@ -812,6 +812,8 @@ COMMAND_LINE_VALUE).
         DEFAULT_VALUE
     bin-directory= bin
         DEFAULT_VALUE
+    check-signature= true
+        DEFAULT_VALUE
     develop= recipes
         /sample-buildout/buildout.cfg
     develop-eggs-directory= develop-eggs
@@ -2755,6 +2757,7 @@ database is shown.
     allow-hosts = *
     allow-picked-versions = true
     bin-directory = /sample-buildout/bin
+    check-signature = true
     develop-eggs-directory = /sample-buildout/develop-eggs
     directory = /sample-buildout
     dry-run = false
