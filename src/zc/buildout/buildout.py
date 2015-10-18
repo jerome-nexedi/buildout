@@ -175,6 +175,9 @@ class Buildout(DictMixin):
 
         __doing__ = 'Initializing.'
 
+        global network_cache_parameter_dict
+        network_cache_parameter_dict = {}
+
         # default options
         data = dict(buildout=_buildout_default_options.copy())
         self._buildout_dir = os.getcwd()
@@ -416,6 +419,31 @@ class Buildout(DictMixin):
             options[name]
 
         os.chdir(options['directory'])
+
+        networkcache_section_name = options.get('networkcache-section')
+        if networkcache_section_name:
+            networkcache_section = self[networkcache_section_name]
+            for k in (
+                'download-cache-url',
+                'download-dir-url',
+                'upload-cache-url',
+                'upload-dir-url',
+                'signature-certificate-list',
+                'signature-private-key-file',
+                'shacache-ca-file',
+                'shacache-cert-file',
+                'shacache-key-file',
+                'shadir-ca-file',
+                'shadir-cert-file',
+                'shadir-key-file',
+            ):
+                network_cache_parameter_dict[k] = networkcache_section.get(k, '')
+                # parse signature list
+                cert_marker = '-----BEGIN CERTIFICATE-----'
+            network_cache_parameter_dict['signature-certificate-list'] = \
+                [cert_marker + '\n' + q.strip() \
+                    for q in network_cache_parameter_dict['signature-certificate-list'].split(cert_marker) \
+                    if q.strip()]
 
     def _buildout_path(self, name):
         if '${' in name:

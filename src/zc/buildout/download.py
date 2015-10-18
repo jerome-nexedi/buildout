@@ -204,10 +204,29 @@ class Download(object):
         handle, tmp_path = tempfile.mkstemp(prefix='buildout-')
         os.close(handle)
         try:
-            tmp_path, headers = urlretrieve(url, tmp_path)
-            if not check_md5sum(tmp_path, md5sum):
-                raise ChecksumError(
-                    'MD5 checksum mismatch downloading %r' % url)
+            from .buildout import network_cache_parameter_dict as nc
+            if not download_network_cached(
+                nc.get('download-dir-url'),
+                nc.get('download-cache-url'),
+                tmp_path, url, self.logger,
+                nc.get('signature-certificate-list'), md5sum):
+                # Download from original url if not cached or md5sum doesn't match.
+                tmp_path, headers = urlretrieve(url, tmp_path)
+                if not check_md5sum(tmp_path, md5sum):
+                    raise ChecksumError(
+                        'MD5 checksum mismatch downloading %r' % url)
+                # Upload the file to network cache.
+                if nc.get('upload-cache-url') and nc.get('upload-dir-url'):
+                    upload_network_cached(
+                        nc.get('upload-dir-url'),
+                        nc.get('upload-cache-url'), url, tmp_path, self.logger,
+                        nc.get('signature-private-key-file'),
+                        nc.get('shacache-ca-file'),
+                        nc.get('shacache-cert-file'),
+                        nc.get('shacache-key-file'),
+                        nc.get('shadir-ca-file'),
+                        nc.get('shadir-cert-file'),
+                        nc.get('shadir-key-file'))
         except IOError:
             e = sys.exc_info()[1]
             os.remove(tmp_path)
@@ -276,6 +295,8 @@ def remove(path):
     if os.path.exists(path):
         os.remove(path)
 
+from zc.buildout.networkcache import download_network_cached, \
+                                     upload_network_cached
 
 def locate_at(source, dest):
     if dest is None or realpath(dest) == realpath(source):
