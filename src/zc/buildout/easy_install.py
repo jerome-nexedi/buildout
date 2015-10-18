@@ -31,6 +31,7 @@ import setuptools.command.easy_install
 import setuptools.command.setopt
 import setuptools.package_index
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -1669,14 +1670,27 @@ def _fix_file_links(links):
 def _final_version(parsed_version):
     return not parsed_version.is_prerelease
 
+def chmod(path):
+    mode = os.lstat(path).st_mode
+    if stat.S_ISLNK(mode):
+        return
+    # give the same permission but write as owner to group and other.
+    mode = stat.S_IMODE(mode)
+    urx = (mode >> 6) & 5
+    new_mode = mode & ~0o77 | urx << 3 | urx
+    if new_mode != mode:
+        os.chmod(path, new_mode)
+
 def redo_pyc(egg):
     if not os.path.isdir(egg):
         return
     for dirpath, dirnames, filenames in os.walk(egg):
+        chmod(dirpath)
         for filename in filenames:
+            filepath = os.path.join(dirpath, filename)
+            chmod(filepath)
             if not filename.endswith('.py'):
                 continue
-            filepath = os.path.join(dirpath, filename)
             if not (os.path.exists(filepath+'c')
                     or os.path.exists(filepath+'o')):
                 # If it wasn't compiled, it may not be compilable
