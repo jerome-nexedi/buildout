@@ -44,6 +44,22 @@ _oprp = getattr(os.path, 'realpath', lambda path: path)
 def realpath(path):
     return os.path.normcase(os.path.abspath(_oprp(path)))
 
+from zc.buildout.networkcache import get_filename_from_url, \
+     download_network_cached, \
+     upload_network_cached, \
+     download_index_network_cached, \
+     upload_index_network_cached
+from setuptools.package_index import HREF, URL_SCHEME, \
+     distros_for_url, htmldecode
+try:
+    # Python 3
+    from urllib.error import HTTPError
+    from urllib.parse import urljoin
+except ImportError:
+    # Python 2
+    from urllib2 import HTTPError
+    from urlparse import urljoin
+
 default_index_url = os.environ.get(
     'buildout-testing-index-url',
     'http://pypi.python.org/simple',
@@ -126,6 +142,96 @@ class AllowHostsPackageIndex(setuptools.package_index.PackageIndex):
             return setuptools.package_index.PackageIndex.url_ok(
                                                 self, url, False)
 
+    def obtain(self, requirement, installer=None):
+        self._current_requirement = str(requirement)
+        return super(AllowHostsPackageIndex, self).obtain(requirement, installer)
+
+    def find_packages(self, requirement):
+        self._current_requirement = str(requirement)
+        return super(AllowHostsPackageIndex, self).find_packages(requirement)
+
+    def process_url(self, url, retrieve=False):
+        """Evaluate a URL as a possible download, and maybe retrieve it"""
+        if url in self.scanned_urls and not retrieve:
+            return
+        self.scanned_urls[url] = True
+        if not URL_SCHEME(url):
+            self.process_filename(url)
+            return
+        else:
+            dists = list(distros_for_url(url))
+            if dists:
+                if not self.url_ok(url):
+                    return
+                self.debug("Found link: %s", url)
+
+        if dists or not retrieve or url in self.fetched_urls:
+            list(map(self.add, dists))
+            return  # don't need the actual page
+
+        if not self.url_ok(url):
+            self.fetched_urls[url] = True
+            return
+
+        self.info("Reading %s", url)
+        self.fetched_urls[url] = True   # prevent multiple fetch attempts
+
+        # We download from cache only if we have a specific version for egg requirement
+        # Reason: If no specific version, we don't want to be blocked with an old index.
+        #         If there is specific version, we want index to freeze forever.
+        download_result = False
+        requirement = getattr(self, '_current_requirement', '')
+        from .buildout import network_cache_parameter_dict as nc
+        if '==' in requirement:
+            download_result = download_index_network_cached(
+                nc.get('download-dir-url'),
+                nc.get('download-cache-url'),
+                url, requirement, logger,
+                nc.get('signature-certificate-list'))
+        if download_result:
+            # Successfully fetched from cache. Hardcode some things...
+            page, base = download_result
+            f = None
+            self.fetched_urls[base] = True
+        else:
+            f = self.open_url(url, "Download error on %s: %%s -- Some packages may not be found!" % url)
+            if f is None: return
+            self.fetched_urls[f.url] = True
+            if 'html' not in f.headers.get('content-type', '').lower():
+                f.close()   # not html, we can't process it
+                return
+
+            base = f.url     # handle redirects
+            page = f.read()
+            if not isinstance(page, str): # We are in Python 3 and got bytes. We want str.
+                if isinstance(f, HTTPError):
+                    # Errors have no charset, assume latin1:
+                    charset = 'latin-1'
+                else:
+                    charset = f.headers.get_param('charset') or 'latin-1'
+                page = page.decode(charset, "ignore")
+            f.close()
+            # Upload the index to network cache.
+            if nc.get('upload-cache-url') \
+                and nc.get('upload-dir-url') \
+                and '==' in requirement \
+                and getattr(f, 'code', None) != 404:
+                upload_index_network_cached(
+                    nc.get('upload-dir-url'),
+                    nc.get('upload-cache-url'),
+                    url, base, requirement, page, logger,
+                    nc.get('signature-private-key-file'),
+                    nc.get('shacache-ca-file'),
+                    nc.get('shacache-cert-file'),
+                    nc.get('shacache-key-file'),
+                    nc.get('shadir-ca-file'),
+                    nc.get('shadir-cert-file'),
+                    nc.get('shadir-key-file'))
+        for match in HREF.finditer(page):
+            link = urljoin(base, htmldecode(match.group(1)))
+            self.process_url(link)
+        if url.startswith(self.index_url) and getattr(f,'code',None)!=404:
+            page = self.process_index(url, page)
 
 _indexes = {}
 def _get_index(index_url, find_links, allow_hosts=('*',)):
@@ -487,7 +593,36 @@ class Installer:
             ):
             return dist
 
-        new_location = self._index.download(dist.location, tmp)
+        # Try to download from shacache first. If not possible, downloads from
+        # Original location and uploads it to shacache.
+        filename = get_filename_from_url(dist.location)
+        new_location = os.path.join(tmp, filename)
+        downloaded_from_cache = False
+        from .buildout import network_cache_parameter_dict as nc
+        if nc.get('download-dir-url') \
+            and nc.get('download-dir-url') \
+            and nc.get('signature-certificate-list'):
+            downloaded_from_cache = download_network_cached(
+                nc.get('download-dir-url'),
+                nc.get('download-cache-url'),
+                new_location, dist.location, logger,
+                nc.get('signature-certificate-list'))
+        if not downloaded_from_cache:
+            new_location = self._index.download(dist.location, tmp)
+            if nc.get('upload-cache-url') \
+                and nc.get('upload-dir-url'):
+                upload_network_cached(
+                    nc.get('upload-dir-url'),
+                    nc.get('upload-cache-url'),
+                    dist.location, new_location, logger,
+                    nc.get('signature-private-key-file'),
+                    nc.get('shacache-ca-file'),
+                    nc.get('shacache-cert-file'),
+                    nc.get('shacache-key-file'),
+                    nc.get('shadir-ca-file'),
+                    nc.get('shadir-cert-file'),
+                    nc.get('shadir-key-file'))
+
         if (download_cache
             and (realpath(new_location) == realpath(dist.location))
             and os.path.isfile(new_location)
