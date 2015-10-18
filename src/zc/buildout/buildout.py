@@ -472,7 +472,14 @@ class Buildout(DictMixin):
         # Now copy buildout and setuptools eggs, and record destination eggs:
         entries = []
         options = self['buildout']
-        for name in 'setuptools', 'zc.buildout':
+        distributions = ['setuptools', 'zc.buildout']
+        try:
+            import slapos.libnetworkcache
+        except ImportError:
+            pass
+        else:
+            distributions.append('slapos.libnetworkcache')
+        for name in distributions:
             if [x for x in sys.argv if \
                 (name == 'setuptools' and \
                      re.match(r'^--setuptools-version(=|$)', x)) or \
