@@ -27,6 +27,11 @@ try:
 except ImportError:
     from collections import MutableMapping as DictMixin
 
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
+
 import zc.buildout.configparser
 import copy
 import datetime
@@ -1173,10 +1178,6 @@ class Buildout(DictMixin):
         self[name] # Add to parts
 
     def parse(self, data):
-        try:
-            from cStringIO import StringIO
-        except ImportError:
-            from io import StringIO
         import textwrap
 
         sections = zc.buildout.configparser.parse(
@@ -1589,6 +1590,7 @@ def _default_globals():
 
     return globals_defs
 
+_open_download_cache = {}
 def _open(base, filename, seen, dl_options, override, downloaded):
     """Open a configuration file and return the result as a dictionary,
 
@@ -1618,8 +1620,14 @@ def _open(base, filename, seen, dl_options, override, downloaded):
             base = os.path.dirname(filename)
         else:
             filename = base + '/' + filename
-            downloaded_filename, is_temp = download(filename)
-            fp = open(downloaded_filename)
+            data = _open_download_cache.get(filename)
+            if data is None:
+                downloaded_filename, is_temp = download(filename)
+                data = open(downloaded_filename).read()
+                _open_download_cache[filename] = data
+            else:
+                is_temp = False
+            fp = StringIO(data)
             base = filename[:filename.rfind('/')]
     else:
         filename = os.path.join(base, filename)
