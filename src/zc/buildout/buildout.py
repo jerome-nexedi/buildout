@@ -269,6 +269,9 @@ class Buildout(DictMixin):
         for name in ('download-cache', 'eggs-directory', 'extends-cache'):
             if name in data['buildout']:
                 origdir, src = data['buildout'][name]
+                if not origdir:
+                    del(data['buildout'][name])
+                    continue
                 if '${' in origdir:
                     continue
                 if not os.path.isabs(origdir):
