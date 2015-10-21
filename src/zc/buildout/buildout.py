@@ -471,16 +471,39 @@ class Buildout(DictMixin):
 
         # Now copy buildout and setuptools eggs, and record destination eggs:
         entries = []
+        options = self['buildout']
         for name in 'setuptools', 'zc.buildout':
+            if [x for x in sys.argv if \
+                (name == 'setuptools' and \
+                     re.match(r'^--setuptools-version(=|$)', x)) or \
+                (name == 'zc.buildout' and \
+                     re.match(r'^--buildout-version(=|$)', x))]:
+                # Specified version is already installed by bootstrap script.
+                    ws = pkg_resources.working_set
+            elif self.offline:
+                ws = zc.buildout.easy_install.working_set(
+                    [name], options['executable'],
+                    [options['develop-eggs-directory'],
+                     options['eggs-directory']],
+                    )
+            else:
+                ws = zc.buildout.easy_install.install(
+                    [name], options['eggs-directory'],
+                    links=self._links,
+                    index=options.get('index'),
+                    path=[options['develop-eggs-directory']],
+                    newest=self.newest,
+                    allow_hosts=self._allow_hosts,
+                    )
             r = pkg_resources.Requirement.parse(name)
-            dist = pkg_resources.working_set.find(r)
+            dist = ws.find(r)
             if dist.precedence == pkg_resources.DEVELOP_DIST:
-                dest = os.path.join(self['buildout']['develop-eggs-directory'],
+                dest = os.path.join(options['develop-eggs-directory'],
                                     name+'.egg-link')
                 open(dest, 'w').write(dist.location)
                 entries.append(dist.location)
             else:
-                dest = os.path.join(self['buildout']['eggs-directory'],
+                dest = os.path.join(options['eggs-directory'],
                                     os.path.basename(dist.location))
                 entries.append(dest)
                 if not os.path.exists(dest):
@@ -492,10 +515,9 @@ class Buildout(DictMixin):
         # Create buildout script
         ws = pkg_resources.WorkingSet(entries)
         ws.require('zc.buildout')
-        options = self['buildout']
         zc.buildout.easy_install.scripts(
             ['zc.buildout'], ws, sys.executable,
-            self['buildout']['bin-directory'],
+            options['bin-directory'],
             relative_paths = (
                 bool_option(options, 'relative-paths', False)
                 and options['directory']
