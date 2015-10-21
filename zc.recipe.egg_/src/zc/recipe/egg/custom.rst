@@ -472,6 +472,10 @@ rpath
    A new-line separated list of directories to search for dynamic libraries
    at run time.
 
+setup-eggs
+   A new-line separated list of eggs that need to be installed
+   beforehand. It is useful to meet the `setup_requires` requirement.
+
 define
    A comma-separated list of names of C preprocessor variables to
    define.

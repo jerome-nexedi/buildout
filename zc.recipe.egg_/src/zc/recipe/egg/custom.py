@@ -44,6 +44,7 @@ class Base:
     def install(self):
         self._set_environment()
         try:
+            self._install_setup_eggs()
             return self._install()
         finally:
             self._restore_environment()
@@ -70,6 +71,24 @@ class Base:
                     del os.environ[key]
                 except KeyError:
                     pass
+
+    def _install_setup_eggs(self):
+        options = self.options
+        setup_eggs = [
+            r.strip()
+            for r in options.get('setup-eggs', '').split('\n')
+            if r.strip()]
+        if setup_eggs:
+            ws = zc.buildout.easy_install.install(
+                setup_eggs, options['_e'],
+                links=self.links,
+                index=self.index,
+                executable=sys.executable,
+                path=[options['_d'], options['_e']],
+                newest=self.newest,
+                )
+            extra_path = os.pathsep.join(ws.entries)
+            os.environ['PYTHONEXTRAPATH'] = extra_path
 
     def _get_patch_dict(self, options, distribution):
         patch_dict = {}
@@ -134,22 +153,6 @@ class Custom(Base):
 
         distribution = options.get('egg', options.get('eggs', self.name)
                                    ).strip()
-
-        setup_eggs = [
-            r.strip()
-            for r in options.get('setup-eggs', '').split('\n')
-            if r.strip()]
-        if setup_eggs:
-            ws = zc.buildout.easy_install.install(
-                setup_eggs, options['_e'],
-                links=self.links,
-                index=self.index,
-                executable=sys.executable,
-                path=[options['_d'], options['_e']],
-                newest=self.newest,
-                )
-            extra_path = os.pathsep.join(ws.entries)
-            self.environment['PYTHONEXTRAPATH'] = os.environ['PYTHONEXTRAPATH'] = extra_path
 
         patch_dict = self._get_patch_dict(options, distribution)
         return zc.buildout.easy_install.build(
