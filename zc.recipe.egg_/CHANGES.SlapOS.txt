@@ -1,0 +1,11 @@
+2.0.3+slapos001
+---------------
+
+- Support environment in :develop as well.
+- Support on the fly patches in zc.recipe.egg by ``EGGNAME-patches``,
+  ``EGGNAME-patch-options``, ``EGGNAME-patch-binary`` (or
+  ``patch-binary``) and ``EGGNAME-patch-revision`` options.
+- Support on the fly patches in zc.recipe.egg:custom by ``patches``,
+  ``patch-options``, ``patch-binary`` and ``patch-revision`` options.
+  (options ``EGGNAME-*`` are also supported as well).
+- Add setup-eggs option in :custom and :develop.
