@@ -1584,6 +1584,12 @@ class Options(DictMixin):
     def __repr__(self):
         return repr(dict(self))
 
+    def __eq__(self, other):
+        try:
+            return sorted(self.items()) == sorted(other.items())
+        except Exception:
+            return super(Options, self).__eq__(other)
+
 Buildout.Options = Options
 
 _spacey_nl = re.compile('[ \t\r\f\v]*\n[ \t\r\f\v\n]*'
