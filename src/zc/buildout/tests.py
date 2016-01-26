@@ -3298,7 +3298,7 @@ def buildout_txt_setup(test):
         os.path.join(eggs, 'zc.recipe.egg'),
         )
 
-egg_parse = re.compile('([0-9a-zA-Z_.]+)-([0-9a-zA-Z_.]+)-py(\d[.]\d).egg$'
+egg_parse = re.compile('([0-9a-zA-Z_.]+)-([0-9a-zA-Z_.+]+)-py(\d[.]\d).egg$'
                        ).match
 def makeNewRelease(project, ws, dest, version='99.99'):
     dist = ws.find(pkg_resources.Requirement.parse(project))
