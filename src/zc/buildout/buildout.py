@@ -801,6 +801,9 @@ class Buildout(DictMixin):
                     ' '.join(installed_parts))
                 _check_for_unused_options_in_section(self, part)
 
+            if self._log_level < logging.INFO:
+                self._save_installed_options()
+
     def _uninstall_part(self, part, installed_part_options):
         # uninstall part
         __doing__ = 'Uninstalling %s.', part
