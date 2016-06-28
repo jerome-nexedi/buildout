@@ -1085,8 +1085,16 @@ class Buildout(DictMixin):
         if not self.newest:
             return
 
+        distributions = ['zc.buildout', 'setuptools']
+        try:
+            import slapos.libnetworkcache
+        except ImportError:
+            pass
+        else:
+            distributions.append('slapos.libnetworkcache')
+
         ws = zc.buildout.easy_install.install(
-            ('zc.buildout', 'setuptools'),
+            distributions,
             self['buildout']['eggs-directory'],
             links = self['buildout'].get('find-links', '').split(),
             index = self['buildout'].get('index'),
@@ -1095,7 +1103,7 @@ class Buildout(DictMixin):
             )
 
         upgraded = []
-        for project in 'zc.buildout', 'setuptools':
+        for project in distributions:
             req = pkg_resources.Requirement.parse(project)
             project_location = pkg_resources.working_set.find(req).location
             if ws.find(req).location != project_location:
