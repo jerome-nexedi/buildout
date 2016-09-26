@@ -1245,6 +1245,7 @@ class Buildout(DictMixin):
                 setuptools=pkg_resources_loc,
                 setupdir=os.path.dirname(setup),
                 setup=setup,
+                path_list=[],
                 __file__ = setup,
                 )).encode())
             args = [sys.executable, tsetup] + args

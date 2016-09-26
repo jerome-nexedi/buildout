@@ -1167,10 +1167,16 @@ def develop(setup, dest,
         undo.append(lambda: os.remove(tsetup))
         undo.append(lambda: os.close(fd))
 
+        extra_path = os.environ.get('PYTHONEXTRAPATH')
+        extra_path_list = []
+        if extra_path:
+          extra_path_list = extra_path.split(os.pathsep)
+
         os.write(fd, (runsetup_template % dict(
             setuptools=setuptools_loc,
             setupdir=directory,
             setup=setup,
+            path_list=extra_path_list,
             __file__ = setup,
             )).encode())
 
@@ -1593,6 +1599,10 @@ runsetup_template = """
 import sys
 sys.path.insert(0, %(setupdir)r)
 sys.path.insert(0, %(setuptools)r)
+
+for extra_path in %(path_list)r:
+  sys.path.insert(0, extra_path)
+
 
 import os, setuptools
 
