@@ -1606,6 +1606,8 @@ for extra_path in %(path_list)r:
 
 import os, setuptools
 
+os.environ['PYTHONPATH'] = (os.pathsep).join(sys.path[:])
+
 __file__ = %(__file__)r
 
 os.chdir(%(setupdir)r)
