@@ -29,6 +29,8 @@ class Base:
         self.name, self.options = name, options
 
         options['_d'] = buildout['buildout']['develop-eggs-directory']
+        options['_e'] = buildout['buildout']['eggs-directory']
+
 
         environment_section = options.get('environment')
         if environment_section:
@@ -40,6 +42,24 @@ class Base:
         options['_environment-data'] = repr(environment_data)
 
         self.build_ext = build_ext(buildout, options)
+
+        links = options.get('find-links',
+                            buildout['buildout'].get('find-links'))
+        if links:
+            links = links.split()
+            options['find-links'] = '\n'.join(links)
+        else:
+            links = ()
+        self.links = links
+
+        index = options.get('index', buildout['buildout'].get('index'))
+        if index is not None:
+            options['index'] = index
+        self.index = index
+
+        self.newest = buildout['buildout'].get('newest') == 'true'
+
+
 
     def install(self):
         self._set_environment()
@@ -119,26 +139,8 @@ class Custom(Base):
     def __init__(self, buildout, name, options):
         Base.__init__(self, buildout, name, options)
 
-        links = options.get('find-links',
-                            buildout['buildout'].get('find-links'))
-        if links:
-            links = links.split()
-            options['find-links'] = '\n'.join(links)
-        else:
-            links = ()
-        self.links = links
-
-        index = options.get('index', buildout['buildout'].get('index'))
-        if index is not None:
-            options['index'] = index
-        self.index = index
-
-        options['_e'] = buildout['buildout']['eggs-directory']
-
         if buildout['buildout'].get('offline') == 'true':
             self._install = lambda: ()
-
-        self.newest = buildout['buildout'].get('newest') == 'true'
 
     def _install(self):
         options = self.options
