@@ -1,3 +1,8 @@
+2.0.3+slapos002
+---------------
+
+- Fix setup-eggs option in :develop.
+
 2.0.3+slapos001
 ---------------
 
