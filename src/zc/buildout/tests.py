@@ -1007,6 +1007,7 @@ Uninstall recipes need to be called when a part is removed too:
     uninstalling
     Installing demo.
     installing
+    Unused options for demo: 'x'.
 
 
     >>> write('buildout.cfg', '''
@@ -2741,6 +2742,73 @@ def increment_on_command_line():
       foo='1 a\nb\nbar'
       recipe='zc.buildout:debug'
     """
+
+def bug_664539_simple_buildout():
+  r"""
+  >>> write('buildout.cfg', '''
+  ... [buildout]
+  ... parts = escape
+  ...
+  ... [escape]
+  ... recipe = zc.buildout:debug
+  ... foo = $${nonexistent:option}
+  ... ''')
+
+  >>> print_(system(buildout), end='')
+  Installing escape.
+    foo='${nonexistent:option}'
+    recipe='zc.buildout:debug'
+  """
+
+def bug_664539_reference():
+  r"""
+  >>> write('buildout.cfg', '''
+  ... [buildout]
+  ... parts = escape
+  ...
+  ... [escape]
+  ... recipe = zc.buildout:debug
+  ... foo = ${:bar}
+  ... bar = $${nonexistent:option}
+  ... ''')
+
+  >>> print_(system(buildout), end='')
+  Installing escape.
+    bar='${nonexistent:option}'
+    foo='${nonexistent:option}'
+    recipe='zc.buildout:debug'
+  """
+
+def bug_664539_complex_buildout():
+  r"""
+  >>> write('buildout.cfg', '''
+  ... [buildout]
+  ... parts = escape
+  ...
+  ... [escape]
+  ... recipe = zc.buildout:debug
+  ... foo = ${level1:foo}
+  ...
+  ... [level1]
+  ... recipe = zc.buildout:debug
+  ... foo = ${level2:foo}
+  ...
+  ... [level2]
+  ... recipe = zc.buildout:debug
+  ... foo = $${nonexistent:option}
+  ... ''')
+
+  >>> print_(system(buildout), end='')
+  Installing level2.
+    foo='${nonexistent:option}'
+    recipe='zc.buildout:debug'
+  Installing level1.
+    foo='${nonexistent:option}'
+    recipe='zc.buildout:debug'
+  Installing escape.
+    foo='${nonexistent:option}'
+    recipe='zc.buildout:debug'
+  """
 
 def test_constrained_requirement():
     """

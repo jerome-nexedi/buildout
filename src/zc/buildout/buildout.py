@@ -703,7 +703,7 @@ class Buildout(DictMixin):
             if part in install_parts:
                 old_options = installed_part_options[part].copy()
                 installed_files = old_options.pop('__buildout_installed__')
-                new_options = self.get(part)
+                new_options = self.get(part).copy()
                 if old_options == new_options:
                     # The options are the same, but are all of the
                     # installed files still there?  If not, we should
@@ -1397,12 +1397,16 @@ class Options(DictMixin):
     def _dosub(self, option, v):
         __doing__ = 'Getting option %s:%s.', self.name, option
         seen = [(self.name, option)]
-        v = '$$'.join([self._sub(s, seen) for s in v.split('$$')])
+        v = '$$'.join([self._sub(s, seen, last=False)
+                       for s in v.split('$$')])
         self._cooked[option] = v
 
-    def get(self, option, default=None, seen=None):
+    def get(self, option, default=None, seen=None, last=True):
         try:
-            return self._data[option]
+            if last:
+                return self._data[option].replace('$${', '${')
+            else:
+                return self._data[option]
         except KeyError:
             pass
 
@@ -1424,16 +1428,20 @@ class Options(DictMixin):
                     )
             else:
                 seen.append(key)
-            v = '$$'.join([self._sub(s, seen) for s in v.split('$$')])
+            v = '$$'.join([self._sub(s, seen, last=False)
+                           for s in v.split('$$')])
             seen.pop()
 
         self._data[option] = v
-        return v
+        if last:
+            return v.replace('$${', '${')
+        else:
+            return v
 
     _template_split = re.compile('([$]{[^}]*})').split
     _simple = re.compile('[-a-zA-Z0-9 ._]+$').match
     _valid = re.compile('\${[-a-zA-Z0-9 ._]*:[-a-zA-Z0-9 ._]+}$').match
-    def _sub(self, template, seen):
+    def _sub(self, template, seen, last=True):
         value = self._template_split(template)
         subs = []
         for ref in value[1::2]:
@@ -1463,7 +1471,7 @@ class Options(DictMixin):
                 section = self.name
             elif section != 'buildout':
                 self._dependency.add(section)
-            v = self.buildout[section].get(option, None, seen)
+            v = self.buildout[section].get(option, None, seen, last=last)
             if v is None:
                 if option == '_buildout_section_name_':
                     v = self.name
@@ -1476,14 +1484,6 @@ class Options(DictMixin):
         return ''.join([''.join(v) for v in zip(value[::2], subs)])
 
     def __getitem__(self, key):
-        try:
-            v = self._data[key]
-            if v.startswith(SERIALISED_VALUE_MAGIC):
-                v = loads(v)
-            return v
-        except KeyError:
-            pass
-
         v = self.get(key)
         if v is None:
             raise MissingOption("Missing option: %s:%s" % (self.name, key))
