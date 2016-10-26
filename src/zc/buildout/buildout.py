@@ -374,6 +374,7 @@ class Buildout(DictMixin):
         self._raw = _unannotate(data)
         self._data = {}
         self._parts = []
+        self._initializing = []
 
         # provide some defaults before options are parsed
         # because while parsing options those attributes might be
@@ -924,9 +925,9 @@ class Buildout(DictMixin):
             recipe, entry = _recipe(options)
             req = pkg_resources.Requirement.parse(recipe)
             sig = sorted(set(_dists_sig(pkg_resources.working_set.resolve([req]))))
-            for dependency in sorted(getattr(options, '_dependency', ())):
+            for dependency in sorted(options.depends):
                 m = md5()
-                for item in sorted(self.get(dependency).items()):
+                for item in sorted(self[dependency].items()):
                     m.update(('%r\0%r\0' % item).encode())
                 sig.append('%s:%s' % (dependency, m.hexdigest()))
             options['__buildout_signature__'] = ' '.join(sig)
@@ -1271,8 +1272,20 @@ class Buildout(DictMixin):
                     v = ' '+v
                 print_("%s =%s" % (k, v))
 
+    def initialize(self, options, reqs, entry):
+        recipe_class = _install_and_load(reqs, 'zc.buildout', entry, self)
+        self._initializing.append(options)
+        try:
+            return recipe_class(self, options.name, options)
+        finally:
+            del self._initializing[-1]
+
     def __getitem__(self, section):
         __doing__ = 'Getting section %s.', section
+        if self._initializing:
+            caller = self._initializing[-1]
+            if 'buildout' != section != caller.name:
+                  caller.depends.add(section)
         try:
             return self._data[section]
         except KeyError:
@@ -1368,7 +1381,7 @@ class Options(DictMixin):
         self._raw = data
         self._cooked = {}
         self._data = {}
-        self._dependency = set()
+        self.depends = set()
 
     def _initialize(self):
         name = self.name
@@ -1386,16 +1399,8 @@ class Options(DictMixin):
             return # buildout section can never be a part
 
         if self.get('recipe'):
-            self.initialize()
+            self.recipe = self.buildout.initialize(self, *_recipe(self._data))
             self.buildout._parts.append(name)
-
-    def initialize(self):
-        reqs, entry = _recipe(self._data)
-        buildout = self.buildout
-        recipe_class = _install_and_load(reqs, 'zc.buildout', entry, buildout)
-
-        name = self.name
-        self.recipe = recipe_class(buildout, name, self)
 
     def _do_extend_raw(self, name, data, doing):
         if name == 'buildout':
@@ -1504,7 +1509,10 @@ class Options(DictMixin):
             if not section:
                 section = self.name
             elif section != 'buildout':
-                self._dependency.add(section)
+                assert not self.buildout._initializing, (self.name,
+                    self.buildout._initializing[-1],
+                    len(self.buildout._initializing))
+                self.depends.add(section)
             v = self.buildout[section].get(option, None, seen, last=last)
             if v is None:
                 if option == '_buildout_section_name_':

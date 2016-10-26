@@ -2079,6 +2079,77 @@ def dealing_with_extremely_insane_dependencies():
     Error: Couldn't find a distribution for 'pack5'.
     """
 
+def test_part_pulled_by_recipe():
+    """
+    >>> mkdir(sample_buildout, 'recipes')
+    >>> write(sample_buildout, 'recipes', 'test.py',
+    ... '''
+    ... class Recipe:
+    ...
+    ...     def __init__(self, buildout, name, options):
+    ...         self.x = buildout[options['x']][name]
+    ...
+    ...     def install(self):
+    ...         print self.x
+    ...         return ()
+    ...
+    ...     update = install
+    ... ''')
+
+
+    >>> write(sample_buildout, 'recipes', 'setup.py',
+    ... '''
+    ... from setuptools import setup
+    ... setup(
+    ...     name = "recipes",
+    ...     entry_points = {'zc.buildout': ['test = test:Recipe']},
+    ...     )
+    ... ''')
+
+    >>> write(sample_buildout, 'buildout.cfg',
+    ... '''
+    ... [buildout]
+    ... develop = recipes
+    ... parts = a
+    ... [a]
+    ... recipe = recipes:test
+    ... x = b
+    ... [b]
+    ... <= a
+    ... a = A
+    ... b = B
+    ... ''')
+
+    >>> os.chdir(sample_buildout)
+    >>> buildout = os.path.join(sample_buildout, 'bin', 'buildout')
+
+    >>> print_(system(buildout), end='')
+    Develop: '/sample-buildout/recipes'
+    Installing b.
+    B
+    Installing a.
+    A
+
+    >>> print_(system(buildout), end='')
+    Develop: '/sample-buildout/recipes'
+    Updating b.
+    B
+    Updating a.
+    A
+
+    >>> cat('.installed.cfg') # doctest: +ELLIPSIS
+    [buildout]
+    ...
+    [b]
+    __buildout_installed__ = 
+    __buildout_signature__ = recipes-c79aac86a90182467ce2fdae8b56eb1c
+    ...
+    [a]
+    __buildout_installed__ = 
+    __buildout_signature__ = recipes-c79aac86a90182467ce2fdae8b56eb1c b:...
+    ...
+    """
+
 def read_find_links_to_load_extensions():
     r"""
 We'll create a wacky buildout extension that just announces itself when used:
