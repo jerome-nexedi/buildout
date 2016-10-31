@@ -1,3 +1,10 @@
+2.5.2+slapos005
+---------------
+
+Fix a regression introduced in 2.5.2+slapos004 with the review of:
+- Add referred parts' hash strings in __buildout_signature__, that invokes
+  rebuild of a part when one of its (recursive) dependencies are modified.
+
 2.5.2+slapos004
 ---------------
 
