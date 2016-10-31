@@ -2118,6 +2118,9 @@ def test_part_pulled_by_recipe():
     ... <= a
     ... a = A
     ... b = B
+    ... c = ${c:x}
+    ... [c]
+    ... x = c
     ... ''')
 
     >>> os.chdir(sample_buildout)
@@ -2142,7 +2145,7 @@ def test_part_pulled_by_recipe():
     ...
     [b]
     __buildout_installed__ = 
-    __buildout_signature__ = recipes-c79aac86a90182467ce2fdae8b56eb1c
+    __buildout_signature__ = recipes-c79aac86a90182467ce2fdae8b56eb1c c:...
     ...
     [a]
     __buildout_installed__ = 

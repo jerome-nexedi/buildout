@@ -1282,23 +1282,22 @@ class Buildout(DictMixin):
 
     def __getitem__(self, section):
         __doing__ = 'Getting section %s.', section
+        try:
+            options = self._data[section]
+        except KeyError:
+            try:
+                data = self._raw[section]
+            except KeyError:
+                raise MissingSection(section)
+
+            options = self.Options(self, section, data)
+            self._data[section] = options
+            options._initialize()
+
         if self._initializing:
             caller = self._initializing[-1]
             if 'buildout' != section != caller.name:
                   caller.depends.add(section)
-        try:
-            return self._data[section]
-        except KeyError:
-            pass
-
-        try:
-            data = self._raw[section]
-        except KeyError:
-            raise MissingSection(section)
-
-        options = self.Options(self, section, data)
-        self._data[section] = options
-        options._initialize()
         return options
 
     def __setitem__(self, name, data):
@@ -1508,12 +1507,14 @@ class Options(DictMixin):
             section, option = s
             if not section:
                 section = self.name
-            elif section != 'buildout':
-                assert not self.buildout._initializing, (self.name,
-                    self.buildout._initializing[-1],
-                    len(self.buildout._initializing))
-                self.depends.add(section)
-            v = self.buildout[section].get(option, None, seen, last=last)
+                options = self
+            else:
+                self.buildout._initializing.append(self)
+                try:
+                    options = self.buildout[section]
+                finally:
+                    del self.buildout._initializing[-1]
+            v = options.get(option, None, seen, last=last)
             if v is None:
                 if option == '_buildout_section_name_':
                     v = self.name
