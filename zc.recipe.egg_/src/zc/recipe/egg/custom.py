@@ -108,7 +108,7 @@ class Base:
                 newest=self.newest,
                 )
             extra_path = os.pathsep.join(ws.entries)
-            os.environ['PYTHONEXTRAPATH'] = extra_path
+            self.environment['PYTHONEXTRAPATH'] = os.environ['PYTHONEXTRAPATH'] = extra_path
 
     def _get_patch_dict(self, options, distribution):
         patch_dict = {}
