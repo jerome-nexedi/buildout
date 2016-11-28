@@ -860,6 +860,8 @@ class Installer:
                 else:
                     logger.debug('Adding required %r', str(req))
                 _log_requirement(ws, req)
+                self._env.scan(
+                    self.build(str(req), {}, patch_dict=patch_dict))
                 for dist in self._get_dist(req, ws,
                                            for_buildout_run=for_buildout_run):
                     ws.add(dist)

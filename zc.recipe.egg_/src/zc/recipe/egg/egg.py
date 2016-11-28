@@ -51,17 +51,21 @@ class Eggs(object):
         options['develop-eggs-directory'] = b_options['develop-eggs-directory']
         options['_d'] = options['develop-eggs-directory'] # backward compat.
 
-    def _get_patch_dict(self, options, distribution_list):
+    def _get_patch_dict(self, options, egg=None):
         patch_dict = {}
         global_patch_binary = options.get('patch-binary', 'patch')
+        if egg:
+            egg = re.sub('[<>=].*', '', egg)
+            egg_list = [egg]
+        else:
+            egg_list = [x[:-8] for x in options.keys() if x.endswith('-patches')]
         def get_option(egg, key, default):
-            if len(distribution_list) == 1:
+            if len(egg_list) == 1:
                 return options.get('%s-%s' % (egg, key),
                                    options.get(key, default))
             else:
                 return options.get('%s-%s' % (egg, key), default)
-        for distribution in distribution_list:
-            egg = re.sub('[<>=].*', '', distribution)
+        for egg in egg_list:
             patches = filter(lambda x:x,
                              map(lambda x:x.strip(),
                                  get_option(egg, 'patches', '').splitlines()))
@@ -103,7 +107,7 @@ class Eggs(object):
                 [options['develop-eggs-directory'], options['eggs-directory']]
                 )
         else:
-            patch_dict = self._get_patch_dict(options, distributions)
+            patch_dict = self._get_patch_dict(options)
             ws = zc.buildout.easy_install.install(
                 distributions, options['eggs-directory'],
                 links=self.links,
