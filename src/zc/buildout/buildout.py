@@ -239,6 +239,8 @@ _buildout_default_options = _annotate_section({
     'use-dependency-links': 'true',
     }, 'DEFAULT_VALUE')
 
+network_cache_parameter_dict = {}
+
 class Buildout(DictMixin):
 
     installed_part_options = None
@@ -248,9 +250,6 @@ class Buildout(DictMixin):
                  command=None, args=()):
 
         __doing__ = 'Initializing.'
-
-        global network_cache_parameter_dict
-        network_cache_parameter_dict = {}
 
         # default options
         data = dict(buildout=_buildout_default_options.copy())
