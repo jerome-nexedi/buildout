@@ -1,3 +1,10 @@
+2.5.2+slapos006
+---------------
+
+- Improve on the fly patches so that specified patches are
+  automatically applied on required eggs as well.
+- Fix exception when easy_install is used without initialising a buildout object.
+
 2.5.2+slapos005
 ---------------
 

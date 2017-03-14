@@ -1,3 +1,9 @@
+2.0.3+slapos003
+---------------
+
+- Improve on the fly patches so that specified patches are
+  automatically applied on required eggs as well.
+
 2.0.3+slapos002
 ---------------
 
