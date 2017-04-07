@@ -261,7 +261,12 @@ if is_win32:
     def _safe_arg(arg):
         return '"%s"' % arg
 else:
-    _safe_arg = str
+    def _safe_arg(arg):
+        if len(arg) < 126:
+            return arg
+        else:
+            # Workaround for the shebang line length limitation.
+            return '/bin/sh\n"exec" "%s" "$0" "$@"' % arg
 
 def call_subprocess(args, **kw):
     if subprocess.call(args, **kw) != 0:
