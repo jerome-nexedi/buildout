@@ -1,3 +1,9 @@
+2.5.2+slapos007
+---------------
+
+- Introduce a workaround for the shebang line length limitation in
+  zc.buildout.easy_install.
+
 2.5.2+slapos006
 ---------------
 
