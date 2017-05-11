@@ -1438,7 +1438,17 @@ class Options(DictMixin):
                        for s in v.split('$$')])
         self._cooked[option] = v
 
-    def get(self, option, default=None, seen=None, last=True):
+    def get(self, *args, **kw):
+      v = self._get(*args, **kw)
+      if hasattr(v, 'startswith') and v.startswith(SERIALISED_VALUE_MAGIC):
+        v = loads(v)
+      return v
+
+    def _get(self, option, default=None, seen=None, last=True):
+        # TODO: raise instead of handling a default parameter,
+        #       so that get() never tries to deserialize a default value
+        #       (and then: move deserialization to __getitem__
+        #                  and make get() use __getitem__)
         try:
             if last:
                 return self._data[option].replace('$${', '${')
@@ -1513,7 +1523,7 @@ class Options(DictMixin):
                     options = self.buildout[section]
                 finally:
                     del self.buildout._initializing[-1]
-            v = options.get(option, None, seen, last=last)
+            v = options._get(option, None, seen, last=last)
             if v is None:
                 if option == '_buildout_section_name_':
                     v = self.name
@@ -1529,8 +1539,6 @@ class Options(DictMixin):
         v = self.get(key)
         if v is None:
             raise MissingOption("Missing option: %s:%s" % (self.name, key))
-        elif v.startswith(SERIALISED_VALUE_MAGIC):
-            v = loads(v)
         return v
 
     def __setitem__(self, option, value):
@@ -1650,8 +1658,12 @@ def _save_option(option, value, f):
 
 def _save_options(section, options, f):
     print_('[%s]' % section, file=f)
-    for option in sorted(options.keys()):
-        _save_option(option, options.get(option), f)
+    try:
+        get_option = options._get
+    except AttributeError:
+        get_option = options.get
+    for option in sorted(options):
+        _save_option(option, get_option(option), f)
 
 def _default_globals():
     """Return a mapping of default and precomputed expressions.
