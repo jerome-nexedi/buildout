@@ -97,7 +97,7 @@ def rmtree (path):
                 raise
             os.unlink(path)
         else:
-            os.chmod(path, 0600)
+            os.chmod(path, 0o600)
             func(path)
 
     shutil.rmtree (path, onerror = retry_writeable)
