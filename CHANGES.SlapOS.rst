@@ -1,3 +1,9 @@
+2.5.2+slapos008
+---------------
+
+- Also run deserializer on each get invocation.
+- Fix syntax error on Python 3.
+
 2.5.2+slapos007
 ---------------
 
