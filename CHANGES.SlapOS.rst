@@ -1,3 +1,8 @@
+2.5.2+slapos009
+---------------
+
+- More fixes for Python 3
+
 2.5.2+slapos008
 ---------------
 
