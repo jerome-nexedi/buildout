@@ -14,22 +14,21 @@
 
 #XXX factor with slapos/grid/networkcache.py and use libnetworkcache helpers
 
+from __future__ import absolute_import, print_function, division
 import hashlib
 import posixpath
 import re
-import sys
 import traceback
 try:
     # Python 3
     from urllib.error import HTTPError
     from urllib.parse import urlparse
-
+    strify = bytes.decode
 except ImportError:
     # Python 2
     from urllib2 import HTTPError
     from urlparse import urlparse
-
-print_ = lambda *a: sys.stdout.write(' '.join(map(str, a))+'\\n')
+    strify = str
 
 try:
     try:
@@ -43,10 +42,10 @@ try:
     else:
         LIBNETWORKCACHE_ENABLED = True
 except:
-    print_('There was problem while trying to import slapos.libnetworkcache:'\
-        '\n%s' % traceback.format_exc())
+    print('There was problem while trying to import slapos.libnetworkcache:\n'
+          + traceback.format_exc())
     LIBNETWORKCACHE_ENABLED = False
-    print_('Networkcache forced to be disabled.')
+    print('Networkcache forced to be disabled.')
 
 _md5_re = re.compile(r'md5=([a-f0-9]+)')
 
@@ -55,7 +54,6 @@ def _get_md5_from_url(url):
   match = _md5_re.search(url)
   if match:
     return match.group(1)
-  return None
 
 def fallback_call(function):
     """Decorator which disallow to have any problem while calling method"""
@@ -66,7 +64,7 @@ def fallback_call(function):
         try:
             return function(self, *args, **kwd)
         except: # indeed, *any* exception is swallowed
-            print_('There was problem while calling method %r:\n%s' % (
+            print('There was problem while calling method %r:\n%s' % (
                 function.__name__, traceback.format_exc()))
             return False
     wrapper.__doc__ = function.__doc__
@@ -82,7 +80,7 @@ def get_directory_key(url):
       - if not, the directory key will be slapos-buildout-urlmd5
     # XXX why is that?
     """
-    urlmd5 = hashlib.md5(url).hexdigest()
+    urlmd5 = hashlib.md5(url.encode()).hexdigest()
     if 'pypi' in url:
       return 'pypi-buildout-%s' % urlmd5
     return 'slapos-buildout-%s' % urlmd5
@@ -91,7 +89,8 @@ def get_directory_key(url):
 def get_index_directory_key(url, requirement):
     """Returns directory hash based on egg requirement.
     """
-    return 'pypi-index-%s-%s' % (hashlib.md5(url).hexdigest(), requirement)
+    urlmd5 = hashlib.md5(url.encode()).hexdigest()
+    return 'pypi-index-%s-%s' % (urlmd5, requirement)
 
 
 @fallback_call
@@ -112,7 +111,7 @@ def download_network_cached(dir_url, cache_url, path, url, logger,
 
     directory_key = get_directory_key(url)
 
-    logger.debug('Trying to download %s from network cache...' % url)
+    logger.debug('Trying to download %s from network cache...', url)
 
     if helper_download_network_cached_to_file(
        dir_url=dir_url,
@@ -120,13 +119,13 @@ def download_network_cached(dir_url, cache_url, path, url, logger,
        signature_certificate_list=signature_certificate_list,
        directory_key=directory_key,
        path=path):
-        logger.info('Downloaded %s from network cache.' % url)
+        logger.info('Downloaded %s from network cache.', url)
 
-        if not check_md5sum(path, md5sum):
-            logger.info('MD5 checksum mismatch downloading %s' % url)
-            return False
-        return True
-    logger.info('Cannot download %s from network cache.' % url)
+        if check_md5sum(path, md5sum):
+            return True
+        logger.info('MD5 checksum mismatch downloading %s', url)
+    else:
+        logger.info('Cannot download %s from network cache.', url)
     return False
 
 @fallback_call
@@ -147,8 +146,8 @@ def download_index_network_cached(dir_url, cache_url, url, requirement, logger,
     directory_key = get_index_directory_key(url, requirement)
 
     wanted_metadata_dict = {
-       'urlmd5':hashlib.md5(url).hexdigest(),
-       'requirement':requirement
+       'urlmd5': hashlib.md5(url.encode()).hexdigest(),
+       'requirement': requirement,
     }
     required_key_list = ['base']
 
@@ -158,15 +157,15 @@ def download_index_network_cached(dir_url, cache_url, url, requirement, logger,
     if result:
         file_descriptor, metadata = result
         try:
-            content = file_descriptor.read()
-            logger.info('Downloaded %s from network cache.' % url)
+            content = strify(file_descriptor.read())
+            logger.info('Downloaded %s from network cache.', url)
             return content, metadata['base']
         except (IOError, DirectoryNotFound) as e:
             if isinstance(e, HTTPError) and e.code == 404:
-              logger.debug('%s does not exist in network cache.' % url)
+              logger.debug('%s does not exist in network cache.', url)
             else:
-              logger.debug('Failed to download from network cache %s: %s' % \
-                                                             (url, str(e)))
+              logger.debug('Failed to download from network cache %s: %s',
+                  url, e)
     return False
 
 @fallback_call
@@ -181,15 +180,14 @@ def upload_network_cached(dir_url, cache_url, external_url, path, logger,
     if not (dir_url and cache_url):
         return False
 
-    logger.info('Uploading %s into network cache.' % external_url)
+    logger.info('Uploading %s into network cache.', external_url)
 
     file_name = get_filename_from_url(external_url)
 
     directory_key = get_directory_key(external_url)
     kw = dict(file_name=file_name,
-              urlmd5=hashlib.md5(external_url).hexdigest())
+              urlmd5=hashlib.md5(external_url.encode()).hexdigest())
 
-    f = open(path, 'r')
     # convert '' into None in order to call nc nicely
     if not signature_private_key_file:
         signature_private_key_file = None
@@ -219,16 +217,11 @@ def upload_network_cached(dir_url, cache_url, external_url, path, logger,
         return False
 
     try:
-        return nc.upload(f, directory_key, **kw)
+        with open(path, 'rb') as f:
+            return nc.upload(f, directory_key, **kw)
     except (IOError, UploadError) as e:
-        logger.info('Fail to upload file. %s' % \
-                                                  (str(e)))
+        logger.info('Fail to upload file. %s', e)
         return False
-
-    finally:
-      f.close()
-
-    return True
 
 @fallback_call
 def upload_index_network_cached(dir_url, cache_url, external_url, base, requirement, content, logger,
@@ -242,7 +235,7 @@ def upload_index_network_cached(dir_url, cache_url, external_url, base, requirem
     if not (dir_url and cache_url):
         return False
 
-    logger.info('Uploading %s content into network cache.' % external_url)
+    logger.info('Uploading %s content into network cache.', external_url)
 
     directory_key = get_index_directory_key(external_url, requirement)
     kw = dict(file="file",
@@ -285,8 +278,7 @@ def upload_index_network_cached(dir_url, cache_url, external_url, base, requirem
     try:
         return nc.upload_generic(f, directory_key, **kw)
     except (IOError, UploadError) as e:
-        logger.info('Fail to upload file. %s' % \
-                                                  (str(e)))
+        logger.info('Fail to upload file. %s', e)
         return False
 
     finally:
@@ -313,4 +305,4 @@ def get_filename_from_url(url):
     return name
 
 
-from zc.buildout.download import check_md5sum
+from .download import check_md5sum
