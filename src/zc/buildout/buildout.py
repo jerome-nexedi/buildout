@@ -66,6 +66,8 @@ def print_(*args, **kw):
         file = sys.stdout
     file.write(sep.join(map(str, args))+end)
 
+_MARKER = []
+
 class BuildoutSerialiser(object):
     # XXX: I would like to access pprint._safe_repr, but it's not
     # officially available. PrettyPrinter class has a functionally-speaking
@@ -1536,8 +1538,8 @@ class Options(DictMixin):
         return ''.join([''.join(v) for v in zip(value[::2], subs)])
 
     def __getitem__(self, key):
-        v = self.get(key)
-        if v is None:
+        v = self.get(key, _MARKER)
+        if v is _MARKER:
             raise MissingOption("Missing option: %s:%s" % (self.name, key))
         return v
 
