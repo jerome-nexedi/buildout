@@ -1,6 +1,14 @@
 Change History
 **************
 
+?.?.? (unreleased)
+==================
+
+- Use HTTPS for PyPI's index.  PyPI redirects HTTP to HTTPS by default
+  now so using HTTPS directly avoids the potential for that redirect
+  being modified in flight.
+
+
 2.5.2 (2016-06-07)
 ==================
 
