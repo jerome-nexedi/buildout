@@ -1,3 +1,8 @@
+2.5.2+slapos010
+---------------
+
+- Fix MissingOption when the serialised (!py!) value is None.
+
 2.5.2+slapos009
 ---------------
 

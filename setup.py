@@ -12,7 +12,7 @@
 #
 ##############################################################################
 name = "zc.buildout"
-version = '2.5.2+slapos009'
+version = '2.5.2+slapos010'
 
 import os
 from setuptools import setup
